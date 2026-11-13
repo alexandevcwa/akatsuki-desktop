@@ -326,11 +326,8 @@ export const App: React.FC = () => {
               </div>
 
               <div className="flex flex-col leading-none pr-1">
-                <span className="font-mono text-[9px] tracking-[0.16em] uppercase text-akatsuki-muted group-hover:text-akatsuki-accent transition-colors">
-                  ESTADO DEL NODO MÓVIL
-                </span>
                 <span className="font-display text-xs tracking-wider uppercase font-bold text-amber-300 group-hover:text-akatsuki-heading transition-colors mt-0.5">
-                  SIN CONEXIÓN ANDROID
+                  SIN CONEXIÓN
                 </span>
               </div>
             </div>
