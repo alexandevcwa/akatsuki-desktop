@@ -125,6 +125,14 @@
   --cyber-border: rgba(168, 85, 247, 0.45);
 }
 
+.cyber-border-success {
+  --cyber-border: rgba(16, 185, 129, 0.65);
+}
+
+.cyber-border-warning {
+  --cyber-border: rgba(245, 158, 11, 0.55);
+}
+
 .cyber-border-transparent {
   --cyber-border: transparent;
 }
