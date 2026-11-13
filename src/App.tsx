@@ -11,6 +11,10 @@ import { useConnectionStore } from "@/features/connection/store/useConnectionSto
 import { ConnectionRadarModal } from "@/features/connection/components/ConnectionRadarModal";
 import { FilePane } from "@/features/explorer/components/FilePane";
 import {
+  createAndroidDirectory,
+  createLocalDirectory,
+  deleteAndroidEntry,
+  deleteLocalEntry,
   listAndroidDirectory,
   listLocalDirectory,
 } from "@/features/explorer/services/explorerIpc";
@@ -20,8 +24,13 @@ import { FileEntry } from "@/shared/types/protocol";
 import { formatBytes, formatShortSha256 } from "@/shared/utils/formatters";
 
 export const App: React.FC = () => {
-  const { status, activeSession, setRadarModalOpen, disconnect } =
-    useConnectionStore();
+  const {
+    status,
+    activeSession,
+    setRadarModalOpen,
+    refreshStorageInfo,
+    disconnect,
+  } = useConnectionStore();
 
   const { enqueueTransfer } = useTransferStore();
 
@@ -30,14 +39,17 @@ export const App: React.FC = () => {
   const [localHostname, setLocalHostname] = useState<string>("");
   const [localEntries, setLocalEntries] = useState<FileEntry[]>([]);
   const [loadingLocal, setLoadingLocal] = useState<boolean>(false);
+  const [localError, setLocalError] = useState<string | null>(null);
 
   // Estado del explorador remoto (Android Web Service)
   const [androidPath, setAndroidPath] = useState<string>("/storage/emulated/0");
   const [androidEntries, setAndroidEntries] = useState<FileEntry[]>([]);
   const [loadingAndroid, setLoadingAndroid] = useState<boolean>(false);
+  const [androidError, setAndroidError] = useState<string | null>(null);
 
   const fetchLocalDir = useCallback(async (targetPath?: string) => {
     setLoadingLocal(true);
+    setLocalError(null);
     try {
       const res = await listLocalDirectory(targetPath);
       setLocalPath(res.currentPath);
@@ -45,6 +57,8 @@ export const App: React.FC = () => {
         setLocalHostname(res.hostname);
       }
       setLocalEntries(res.entries);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoadingLocal(false);
     }
@@ -54,6 +68,7 @@ export const App: React.FC = () => {
     async (targetPath: string) => {
       if (!activeSession) return;
       setLoadingAndroid(true);
+      setAndroidError(null);
       try {
         const res = await listAndroidDirectory({
           ipAddress: activeSession.device.ipAddress,
@@ -63,11 +78,13 @@ export const App: React.FC = () => {
         });
         setAndroidPath(res.currentPath);
         setAndroidEntries(res.entries);
+      } catch (err) {
+        setAndroidError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoadingAndroid(false);
       }
     },
-    [activeSession],
+    [activeSession]
   );
 
   useEffect(() => {
@@ -79,6 +96,7 @@ export const App: React.FC = () => {
       fetchAndroidDir(androidPath);
     } else {
       setAndroidEntries([]);
+      setAndroidError(null);
     }
   }, [activeSession, androidPath, fetchAndroidDir]);
 
@@ -89,12 +107,12 @@ export const App: React.FC = () => {
     return clean.slice(0, idx);
   };
 
-  const handleSendToAndroid = (file: FileEntry) => {
+  const handleSendToAndroid = async (file: FileEntry) => {
     if (!activeSession) {
       setRadarModalOpen(true);
       return;
     }
-    enqueueTransfer({
+    await enqueueTransfer({
       file,
       destinationDir: androidPath,
       direction: "pc_to_android",
@@ -102,11 +120,13 @@ export const App: React.FC = () => {
       port: activeSession.device.port,
       bearerToken: activeSession.bearerToken,
     });
+    await fetchAndroidDir(androidPath);
+    await refreshStorageInfo();
   };
 
-  const handleReceiveFromAndroid = (file: FileEntry) => {
+  const handleReceiveFromAndroid = async (file: FileEntry) => {
     if (!activeSession) return;
-    enqueueTransfer({
+    await enqueueTransfer({
       file,
       destinationDir: localPath || "/tmp",
       direction: "android_to_pc",
@@ -114,6 +134,59 @@ export const App: React.FC = () => {
       port: activeSession.device.port,
       bearerToken: activeSession.bearerToken,
     });
+    await fetchLocalDir(localPath);
+  };
+
+  const handleCreateLocalFolder = async (folderName: string) => {
+    const fullPath = `${localPath.replace(/\/$/, "")}/${folderName}`;
+    try {
+      await createLocalDirectory(fullPath);
+      await fetchLocalDir(localPath);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDeleteLocalEntry = async (entry: FileEntry) => {
+    try {
+      await deleteLocalEntry(entry.path);
+      await fetchLocalDir(localPath);
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleCreateAndroidFolder = async (folderName: string) => {
+    if (!activeSession) return;
+    const fullPath = `${androidPath.replace(/\/$/, "")}/${folderName}`;
+    try {
+      await createAndroidDirectory({
+        ipAddress: activeSession.device.ipAddress,
+        port: activeSession.device.port,
+        bearerToken: activeSession.bearerToken,
+        path: fullPath,
+      });
+      await fetchAndroidDir(androidPath);
+      await refreshStorageInfo();
+    } catch (err) {
+      setAndroidError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDeleteAndroidEntry = async (entry: FileEntry) => {
+    if (!activeSession) return;
+    try {
+      await deleteAndroidEntry({
+        ipAddress: activeSession.device.ipAddress,
+        port: activeSession.device.port,
+        bearerToken: activeSession.bearerToken,
+        path: entry.path,
+      });
+      await fetchAndroidDir(androidPath);
+      await refreshStorageInfo();
+    } catch (err) {
+      setAndroidError(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const isConnected = status === "connected" && activeSession !== null;
@@ -221,29 +294,38 @@ export const App: React.FC = () => {
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <FilePane
             side="pc"
-            title="NODO LOCAL"
+            title="NODO LOCAL // COMPUTADORA"
             badgeLabel={localHostname}
             currentPath={localPath || "~"}
             entries={localEntries}
             loading={loadingLocal}
             connected={isConnected}
+            errorMessage={localError}
             onNavigate={(newPath) => fetchLocalDir(newPath)}
             onNavigateUp={() => fetchLocalDir(navigateUp(localPath))}
             onRefresh={() => fetchLocalDir(localPath)}
             onTransferFile={handleSendToAndroid}
+            onCreateFolder={handleCreateLocalFolder}
+            onDeleteEntry={handleDeleteLocalEntry}
           />
 
           <FilePane
             side="android"
-            title="NODO REMOTO"
+            title="NODO REMOTO // ANDROID WEB SERVICE"
             currentPath={androidPath}
             entries={androidEntries}
             loading={loadingAndroid}
             connected={isConnected}
+            errorMessage={androidError}
             onNavigate={(newPath) => setAndroidPath(newPath)}
             onNavigateUp={() => setAndroidPath(navigateUp(androidPath))}
-            onRefresh={() => fetchAndroidDir(androidPath)}
+            onRefresh={() => {
+              fetchAndroidDir(androidPath);
+              refreshStorageInfo();
+            }}
             onTransferFile={handleReceiveFromAndroid}
+            onCreateFolder={handleCreateAndroidFolder}
+            onDeleteEntry={handleDeleteAndroidEntry}
             onOpenConnectModal={() => setRadarModalOpen(true)}
           />
         </div>

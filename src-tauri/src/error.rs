@@ -9,6 +9,9 @@ pub enum AkatsukiError {
     #[error("Error de red HTTPS hacia el servicio Android: {0}")]
     Network(#[from] reqwest::Error),
 
+    #[error("Respuesta de error del Servidor Android (HTTP {status}): {message}")]
+    HttpStatus { status: u16, message: String },
+
     #[error("Fallo de seguridad TLS / Certificate Pinning (TOFU): {0}")]
     TlsPinningError(String),
 

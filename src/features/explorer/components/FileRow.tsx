@@ -7,6 +7,7 @@ import {
   Archive,
   ArrowRight,
   ArrowLeft,
+  Trash2,
 } from "lucide-react";
 import { FileEntry } from "@/shared/types/protocol";
 import { ListItemText, MonoTelemetry, MonoHash, CyberButton } from "@/design-system";
@@ -19,6 +20,7 @@ interface FileRowProps {
   onSelect: () => void;
   onOpenDir: () => void;
   onTransfer: () => void;
+  onDelete: () => void;
   canTransfer: boolean;
 }
 
@@ -29,17 +31,20 @@ export const FileRow: React.FC<FileRowProps> = ({
   onSelect,
   onOpenDir,
   onTransfer,
+  onDelete,
   canTransfer,
 }) => {
   const renderFileIcon = () => {
     if (entry.isDir) {
-      return <Folder className="w-4 h-4 text-akatsuki-primary-glow fill-akatsuki-primary/20 shrink-0" />;
+      return (
+        <Folder className="w-4 h-4 text-akatsuki-primary-glow fill-akatsuki-primary/20 shrink-0" />
+      );
     }
     const ext = entry.extension?.toLowerCase() || "";
     if (["mp4", "mkv", "mov", "webm"].includes(ext)) {
       return <Film className="w-4 h-4 text-akatsuki-cyan shrink-0" />;
     }
-    if (["png", "jpg", "jpeg", "webp", "raw", "svg"].includes(ext)) {
+    if (["png", "jpg", "jpeg", "webp", "raw", "dng", "svg"].includes(ext)) {
       return <ImageIcon className="w-4 h-4 text-akatsuki-purple shrink-0" />;
     }
     if (["zip", "tar", "gz", "7z", "rar"].includes(ext)) {
@@ -71,7 +76,7 @@ export const FileRow: React.FC<FileRowProps> = ({
         </ListItemText>
       </div>
 
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
         <MonoHash className="hidden sm:inline-block w-28 text-right">
           {entry.modifiedAt}
         </MonoHash>
@@ -80,7 +85,7 @@ export const FileRow: React.FC<FileRowProps> = ({
           {entry.isDir ? "DIR" : formatBytes(entry.sizeBytes)}
         </MonoTelemetry>
 
-        <div className="w-24 flex justify-end">
+        <div className="w-32 flex items-center justify-end gap-1.5">
           {!entry.isDir ? (
             <CyberButton
               variant={side === "pc" ? "primary" : "secondary"}
@@ -112,6 +117,18 @@ export const FileRow: React.FC<FileRowProps> = ({
               Abrir
             </CyberButton>
           )}
+
+          <button
+            type="button"
+            title={`Eliminar ${entry.name}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="p-1.5 text-akatsuki-muted hover:text-akatsuki-danger transition-colors opacity-60 group-hover:opacity-100"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
     </div>

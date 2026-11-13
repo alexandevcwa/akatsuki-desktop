@@ -1,11 +1,15 @@
-use crate::domain::file_entry::{DirectoryListing, FileEntry};
+use crate::domain::file_entry::{
+    DeleteEntryResponse, DirectoryListing, FileEntry, MkdirResponse,
+};
 use crate::error::AkatsukiResult;
-use crate::infrastructure::android_client::fetch_android_directory;
+use crate::infrastructure::android_client::{
+    create_android_directory, delete_android_entry, fetch_android_directory,
+};
 use chrono::{DateTime, Local};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::fs;
 
-fn get_system_hostname() -> String {
+pub fn get_system_hostname() -> String {
     if let Ok(content) = std::fs::read_to_string("/etc/hostname") {
         let trimmed = content.trim();
         if !trimmed.is_empty() {
@@ -41,7 +45,6 @@ pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryLis
 
     while let Some(entry) = read_dir.next_entry().await? {
         let file_name = entry.file_name().to_string_lossy().to_string();
-        // Ignoramos archivos ocultos para mantener el explorador táctico limpio
         if file_name.starts_with('.') {
             continue;
         }
@@ -78,7 +81,6 @@ pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryLis
         }
     }
 
-    // Ordenar: Carpetas primero, luego alfabéticamente
     entries.sort_by(|a, b| match (a.is_dir, b.is_dir) {
         (true, false) => std::cmp::Ordering::Less,
         (false, true) => std::cmp::Ordering::Greater,
@@ -93,6 +95,30 @@ pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryLis
 }
 
 #[tauri::command]
+pub async fn create_local_dir(path: String) -> AkatsukiResult<MkdirResponse> {
+    fs::create_dir_all(&path).await?;
+    Ok(MkdirResponse {
+        created: true,
+        path,
+    })
+}
+
+#[tauri::command]
+pub async fn delete_local_entry(path: String) -> AkatsukiResult<DeleteEntryResponse> {
+    let target = Path::new(&path);
+    let metadata = fs::metadata(target).await?;
+    if metadata.is_dir() {
+        fs::remove_dir_all(target).await?;
+    } else {
+        fs::remove_file(target).await?;
+    }
+    Ok(DeleteEntryResponse {
+        deleted: true,
+        path,
+    })
+}
+
+#[tauri::command]
 pub async fn list_android_dir(
     ip_address: String,
     port: u16,
@@ -100,4 +126,24 @@ pub async fn list_android_dir(
     path: String,
 ) -> AkatsukiResult<DirectoryListing> {
     fetch_android_directory(&ip_address, port, &bearer_token, &path).await
+}
+
+#[tauri::command]
+pub async fn create_android_dir(
+    ip_address: String,
+    port: u16,
+    bearer_token: String,
+    path: String,
+) -> AkatsukiResult<MkdirResponse> {
+    create_android_directory(&ip_address, port, &bearer_token, &path).await
+}
+
+#[tauri::command]
+pub async fn delete_android_file_entry(
+    ip_address: String,
+    port: u16,
+    bearer_token: String,
+    path: String,
+) -> AkatsukiResult<DeleteEntryResponse> {
+    delete_android_entry(&ip_address, port, &bearer_token, &path).await
 }

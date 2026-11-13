@@ -26,3 +26,4 @@ dist-ssr
 # Rust / Tauri
 /src-tauri/target/
 /src-tauri/gen/
+docs/AKATSUKI_DESIGN_AND_ANDROID_API_SPEC.md
