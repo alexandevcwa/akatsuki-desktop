@@ -30,21 +30,28 @@ pub fn build_android_https_client(timeout_secs: u64) -> AkatsukiResult<Client> {
     Ok(client)
 }
 
-/// Valida que la respuesta HTTP tenga un código 2xx; de lo contrario extrae el mensaje de error.
+/// Valida que la respuesta tenga un estado exitoso; de lo contrario devuelve un mensaje claro para el usuario.
 async fn ensure_success_status(resp: Response) -> AkatsukiResult<Response> {
     let status = resp.status();
     if status.is_success() {
         return Ok(resp);
     }
-    let code = status.as_u16();
-    let body_text = resp
-        .text()
-        .await
-        .unwrap_or_else(|_| "Error desconocido del servidor Android".to_string());
-    Err(AkatsukiError::HttpStatus {
-        status: code,
-        message: body_text,
-    })
+
+    let friendly_message = match status.as_u16() {
+        400 => "Los datos enviados al dispositivo Android no son válidos. Revisa la dirección y el PIN.",
+        401 => "Código PIN incorrecto o sesión expirada. Verifica el PIN mostrado en tu celular Android.",
+        403 => "Acceso denegado por el dispositivo Android. Concede los permisos en la aplicación móvil.",
+        404 => "El recurso o carpeta solicitada no existe en el dispositivo Android.",
+        409 => "Ya existe un archivo o carpeta con ese mismo nombre en el dispositivo Android.",
+        422 => "El archivo no pudo verificarse correctamente en el dispositivo Android.",
+        429 => "Demasiados intentos de vinculación fallidos. Espera unos segundos antes de intentar de nuevo.",
+        500..=599 => "Ocurrió un problema interno en la aplicación del dispositivo Android.",
+        _ => "No se pudo completar la operación con el dispositivo Android. Intenta nuevamente.",
+    };
+
+    Err(AkatsukiError::HttpStatusFriendly(
+        friendly_message.to_string(),
+    ))
 }
 
 /// 1. `GET /api/v1/health` — Verifica estado del servidor Android y obtiene su huella TLS.

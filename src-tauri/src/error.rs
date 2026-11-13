@@ -3,23 +3,41 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AkatsukiError {
-    #[error("Error de E/S en el sistema de archivos: {0}")]
+    #[error("No se pudo acceder al archivo o carpeta solicitada en el equipo.")]
     Io(#[from] std::io::Error),
 
-    #[error("Error de red HTTPS hacia el servicio Android: {0}")]
-    Network(#[from] reqwest::Error),
+    #[error("{0}")]
+    NetworkFriendly(String),
 
-    #[error("Respuesta de error del Servidor Android (HTTP {status}): {message}")]
-    HttpStatus { status: u16, message: String },
+    #[error("{0}")]
+    HttpStatusFriendly(String),
 
-    #[error("Fallo de seguridad TLS / Certificate Pinning (TOFU): {0}")]
+    #[error("La verificación de seguridad del dispositivo falló: {0}")]
     TlsPinningError(String),
 
-    #[error("Discrepancia de integridad SHA-256: esperado {expected}, calculado {actual}")]
+    #[error("El archivo transferido no superó la verificación de integridad. Intenta enviarlo nuevamente.")]
     IntegrityMismatch { expected: String, actual: String },
 
-    #[error("Operación inválida: {0}")]
+    #[error("{0}")]
     InvalidOperation(String),
+}
+
+impl From<reqwest::Error> for AkatsukiError {
+    fn from(err: reqwest::Error) -> Self {
+        if err.is_timeout() {
+            return AkatsukiError::NetworkFriendly(
+                "El dispositivo Android tardó demasiado en responder. Verifica que la pantalla esté activa y en la misma red Wi-Fi.".to_string(),
+            );
+        }
+        if err.is_connect() {
+            return AkatsukiError::NetworkFriendly(
+                "No se encontró el dispositivo Android en la dirección indicada. Verifica la IP, el puerto y que el servicio esté iniciado en tu celular.".to_string(),
+            );
+        }
+        AkatsukiError::NetworkFriendly(
+            "No fue posible comunicarse con el dispositivo Android. Revisa tu conexión de red local.".to_string(),
+        )
+    }
 }
 
 impl Serialize for AkatsukiError {

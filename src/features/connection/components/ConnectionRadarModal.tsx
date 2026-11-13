@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Link2,
   Activity,
+  AlertCircle,
 } from "lucide-react";
 import {
   CyberPanel,
@@ -22,6 +23,36 @@ import {
 } from "@/design-system";
 import { useAnimatedPresence } from "@/shared/utils/useAnimatedPresence";
 import { useConnectionStore } from "../store/useConnectionStore";
+
+/**
+ * Sanitiza cualquier mensaje de error para asegurar que nunca se muestre JSON crudo
+ * ni trazas técnicas al usuario final.
+ */
+function formatUserFriendlyError(rawError: string | null): string | null {
+  if (!rawError) return null;
+  const trimmed = rawError.trim();
+
+  if (
+    trimmed.includes("401") ||
+    /unauthorized|invalid.*pin|pin.*incorrect/i.test(trimmed)
+  ) {
+    return "Código PIN incorrecto o sesión expirada. Verifica el PIN mostrado en tu celular Android.";
+  }
+  if (trimmed.includes("403") || /forbidden/i.test(trimmed)) {
+    return "El dispositivo Android rechazó el acceso. Acepta los permisos en tu celular.";
+  }
+  if (trimmed.includes("429") || /too many/i.test(trimmed)) {
+    return "Demasiados intentos fallidos. Espera un momento antes de volver a intentarlo.";
+  }
+  if (
+    trimmed.startsWith("{") ||
+    trimmed.includes('{"') ||
+    trimmed.includes("HTTP ")
+  ) {
+    return "No se pudo vincular con el dispositivo Android. Verifica que el PIN y la dirección IP sean correctos.";
+  }
+  return trimmed;
+}
 
 export const ConnectionRadarModal: React.FC = () => {
   const {
@@ -43,8 +74,7 @@ export const ConnectionRadarModal: React.FC = () => {
   const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(undefined);
   const [probingHealth, setProbingHealth] = useState(false);
 
-  // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado,
-  // evitando bloquear el hilo de renderizado durante los frames de apertura.
+  // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado
   useEffect(() => {
     if (isRadarModalOpen) {
       const timer = setTimeout(() => {
@@ -91,6 +121,8 @@ export const ConnectionRadarModal: React.FC = () => {
     pin: pinCode,
   });
 
+  const cleanError = formatUserFriendlyError(errorMessage);
+
   return (
     <div
       onClick={() => setRadarModalOpen(false)}
@@ -105,8 +137,8 @@ export const ConnectionRadarModal: React.FC = () => {
         }`}
       >
         <CyberPanel
-          title="RADAR DE CONEXIÓN // ANDROID WEB SERVICE"
-          subtitle="Descubrimiento LAN (/api/v1/health) + Emparejamiento HTTPS TLS 1.3 TOFU (/api/v1/auth/pair)"
+          title="RADAR DE CONEXIÓN // DISPOSITIVO ANDROID"
+          subtitle="Vinculación segura en red local mediante detección automática, código PIN o QR"
           accentColor="crimson"
           className="w-full"
           headerRight={
@@ -138,7 +170,7 @@ export const ConnectionRadarModal: React.FC = () => {
                     />
                   }
                 >
-                  {status === "scanning" ? "Escaneando..." : "Escanear LAN"}
+                  {status === "scanning" ? "Buscando..." : "Buscar en Red"}
                 </CyberButton>
               </div>
 
@@ -147,12 +179,12 @@ export const ConnectionRadarModal: React.FC = () => {
                   <div className="p-5 bg-akatsuki-mantle cyber-chamfer-sm cyber-border-subtle text-center space-y-1.5">
                     <MonoHash className="block text-akatsuki-heading">
                       {status === "scanning"
-                        ? "ESCANEANDO SUBRED LOCAL EN PUERTO 8443..."
-                        : "NINGÚN SERVIDOR ANDROID DETECTADO AUTOMÁTICAMENTE"}
+                        ? "BUSCANDO DISPOSITIVOS ANDROID EN TU RED WI-FI..."
+                        : "NO SE DETECTARON DISPOSITIVOS AUTOMÁTICAMENTE"}
                     </MonoHash>
                     <BodyText className="text-xs text-akatsuki-muted">
-                      Asegúrate de que el servicio web en tu celular Android esté activo en la misma
-                      red Wi-Fi o ingresa su IP:Puerto manualmente a la derecha.
+                      Asegúrate de que la aplicación en tu celular Android esté activa en la misma
+                      red Wi-Fi o ingresa su dirección IP y puerto en el panel derecho.
                     </BodyText>
                   </div>
                 ) : (
@@ -178,12 +210,12 @@ export const ConnectionRadarModal: React.FC = () => {
                               {dev.deviceName}
                             </span>
                           </div>
-                          <CyberBadge tone="cyan">{dev.discoveredVia.toUpperCase()}</CyberBadge>
+                          <CyberBadge tone="cyan">DETECTADO</CyberBadge>
                         </div>
 
                         <div className="flex items-center justify-between">
                           <MonoTelemetry>
-                            https://{dev.ipAddress}:{dev.port}
+                            {dev.ipAddress}:{dev.port}
                           </MonoTelemetry>
                           <span className="text-mono-hash text-akatsuki-muted">{dev.model}</span>
                         </div>
@@ -191,7 +223,7 @@ export const ConnectionRadarModal: React.FC = () => {
                         <div className="pt-1 border-t border-white/5 flex items-center gap-1.5">
                           <ShieldCheck className="w-3.5 h-3.5 text-akatsuki-purple shrink-0" />
                           <MonoHash className="truncate">
-                            TLS SHA-256: {dev.tlsCertFingerprintSha256}
+                            Huella de Seguridad: {dev.tlsCertFingerprintSha256}
                           </MonoHash>
                         </div>
                       </div>
@@ -200,29 +232,29 @@ export const ConnectionRadarModal: React.FC = () => {
                 )}
               </div>
 
-              {/* Bloque Informativo de Seguridad TOFU */}
+              {/* Bloque Informativo de Seguridad */}
               <div className="p-3 bg-akatsuki-mantle/80 border border-akatsuki-purple/30 space-y-1">
                 <div className="flex items-center gap-2">
                   <Lock className="w-3.5 h-3.5 text-akatsuki-purple" />
                   <span className="font-display text-list-header uppercase text-purple-300">
-                    Arquitectura de Seguridad: Certificate Pinning (TOFU)
+                    Enlace Cifrado y Verificado
                   </span>
                 </div>
                 <BodyText className="text-xs text-akatsuki-muted">
-                  El Core de Rust valida criptográficamente la huella SHA-256 del certificado TLS
-                  autofirmado del servidor Android y firma cada petición con tu Token Bearer de sesión.
+                  La transferencia entre tu computadora y tu celular Android está protegida con
+                  cifrado de extremo a extremo y validación automática de integridad en cada archivo.
                 </BodyText>
               </div>
             </div>
 
-            {/* Columna Derecha: Formulario de Conexión Manual + Health Check + QR */}
+            {/* Columna Derecha: Formulario de Conexión Manual + QR */}
             <form
               onSubmit={handleConnect}
               className="md:col-span-5 flex flex-col justify-between space-y-4 bg-akatsuki-mantle p-4 border border-white/10"
             >
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Heading3>Parámetros del Web Service</Heading3>
+                  <Heading3>Datos de Conexión</Heading3>
                   <CyberButton
                     type="button"
                     variant="ghost"
@@ -231,7 +263,7 @@ export const ConnectionRadarModal: React.FC = () => {
                     disabled={probingHealth}
                     leftIcon={<Activity className="w-3.5 h-3.5 text-akatsuki-cyan" />}
                   >
-                    {probingHealth ? "Probando..." : "Ping /health"}
+                    {probingHealth ? "Verificando..." : "Verificar IP"}
                   </CyberButton>
                 </div>
 
@@ -247,7 +279,7 @@ export const ConnectionRadarModal: React.FC = () => {
                   </div>
                   <div>
                     <CyberInput
-                      label="Puerto HTTPS"
+                      label="Puerto"
                       value={port}
                       onChange={(e) => setPort(e.target.value)}
                       mono
@@ -257,15 +289,15 @@ export const ConnectionRadarModal: React.FC = () => {
                 </div>
 
                 <CyberInput
-                  label="PIN de Emparejamiento (6 dígitos)"
-                  placeholder="Ej. 749201"
+                  label="Código PIN de Vinculación"
+                  placeholder="Ingresa el PIN de 6 dígitos"
                   value={pinCode}
                   onChange={(e) => setPinCode(e.target.value)}
                   mono
                   required
                 />
 
-                {/* QR para escaneo inverso desde la app Android */}
+                {/* QR para escaneo desde la app Android */}
                 <div className="pt-2 flex items-center gap-3 bg-akatsuki-panel p-2.5 border border-white/10">
                   <div className="bg-white p-1.5 rounded-sm shrink-0">
                     <QRCodeSVG value={qrPayload} size={68} level="M" />
@@ -275,15 +307,18 @@ export const ConnectionRadarModal: React.FC = () => {
                       Sincronización Rápida QR
                     </span>
                     <p className="text-[11px] text-akatsuki-muted leading-tight">
-                      Escanea desde tu app Android o pulsa Conectar para ejecutar{" "}
-                      <code className="text-akatsuki-telemetry">POST /api/v1/auth/pair</code>.
+                      Escanea este código desde la aplicación de tu celular Android o ingresa el
+                      código PIN para vincular ambos equipos.
                     </p>
                   </div>
                 </div>
 
-                {errorMessage && (
-                  <div className="animate-cyber-slide-down p-2 bg-akatsuki-primary-muted border border-akatsuki-danger text-xs text-akatsuki-accent font-mono break-words">
-                    {errorMessage}
+                {cleanError && (
+                  <div className="animate-cyber-slide-down p-2.5 bg-akatsuki-primary-muted/90 cyber-chamfer-sm cyber-border-crimson flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-akatsuki-primary-glow shrink-0 mt-0.5" />
+                    <span className="text-xs font-sans text-akatsuki-heading leading-snug">
+                      {cleanError}
+                    </span>
                   </div>
                 )}
               </div>
@@ -295,7 +330,7 @@ export const ConnectionRadarModal: React.FC = () => {
                 leftIcon={<Link2 className="w-4 h-4" />}
                 disabled={status === "pairing"}
               >
-                {status === "pairing" ? "Verificando TLS & PIN..." : "Conectar al Servicio Android"}
+                {status === "pairing" ? "Conectando con Android..." : "Conectar Dispositivo"}
               </CyberButton>
             </form>
           </div>
