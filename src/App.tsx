@@ -259,9 +259,9 @@ export const App: React.FC = () => {
         className="h-16 px-5 bg-akatsuki-mantle/95 border-b border-white/10 flex items-center justify-between gap-4 shrink-0 cursor-default"
       >
         {/* Identidad Visual Akatsuki */}
-        <div data-tauri-drag-region className="flex items-center gap-3.5">
-          <div className="p-2 bg-akatsuki-panel cyber-chamfer-sm cyber-border-crimson flex items-center justify-center pointer-events-none">
-            <AkatsukiCloudIcon className="w-8 h-5" />
+        <div data-tauri-drag-region className="flex items-center gap-4">
+          <div className="flex items-center justify-center py-1 pointer-events-none">
+            <AkatsukiCloudIcon className="h-11 w-auto" />
           </div>
           <Heading1
             data-tauri-drag-region
