@@ -59,6 +59,7 @@ export const ConnectionRadarModal: React.FC = () => {
     isRadarModalOpen,
     setRadarModalOpen,
     status,
+    scanRemainingSeconds,
     discoveredDevices,
     scanNetwork,
     probeNodeHealth,
@@ -66,12 +67,17 @@ export const ConnectionRadarModal: React.FC = () => {
     errorMessage,
   } = useConnectionStore();
 
-  const { shouldRender, isClosing } = useAnimatedPresence(isRadarModalOpen, 140);
+  const { shouldRender, isClosing } = useAnimatedPresence(
+    isRadarModalOpen,
+    140,
+  );
 
   const [ipAddress, setIpAddress] = useState("192.168.1.88");
   const [port, setPort] = useState("8443");
   const [pinCode, setPinCode] = useState("");
-  const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(undefined);
+  const [selectedFingerprint, setSelectedFingerprint] = useState<
+    string | undefined
+  >(undefined);
   const [probingHealth, setProbingHealth] = useState(false);
 
   // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado
@@ -100,7 +106,10 @@ export const ConnectionRadarModal: React.FC = () => {
   const handleProbeHealth = async () => {
     setProbingHealth(true);
     try {
-      const node = await probeNodeHealth(ipAddress.trim(), Number(port) || 8443);
+      const node = await probeNodeHealth(
+        ipAddress.trim(),
+        Number(port) || 8443,
+      );
       if (node) {
         setSelectedFingerprint(node.tlsCertFingerprintSha256);
       }
@@ -111,7 +120,12 @@ export const ConnectionRadarModal: React.FC = () => {
 
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
-    connectToDevice(ipAddress.trim(), Number(port) || 8443, pinCode.trim(), selectedFingerprint);
+    connectToDevice(
+      ipAddress.trim(),
+      Number(port) || 8443,
+      pinCode.trim(),
+      selectedFingerprint,
+    );
   };
 
   const qrPayload = JSON.stringify({
@@ -164,27 +178,35 @@ export const ConnectionRadarModal: React.FC = () => {
                   variant="secondary"
                   size="sm"
                   onClick={scanNetwork}
+                  className={`tabular-nums min-w-[146px] ${
+                    status === "scanning"
+                      ? "pointer-events-none bg-akatsuki-cyan/15 cyber-border-cyan"
+                      : ""
+                  }`}
                   leftIcon={
                     <RefreshCw
                       className={`w-3.5 h-3.5 ${status === "scanning" ? "animate-spin" : ""}`}
                     />
                   }
                 >
-                  {status === "scanning" ? "Buscando..." : "Buscar en Red"}
+                  {status === "scanning"
+                    ? `Buscando (${scanRemainingSeconds || 10}s)...`
+                    : "Buscar en Red"}
                 </CyberButton>
               </div>
 
               <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
                 {discoveredDevices.length === 0 ? (
                   <div className="p-5 bg-akatsuki-mantle cyber-chamfer-sm cyber-border-subtle text-center space-y-1.5">
-                    <MonoHash className="block text-akatsuki-heading">
+                    <MonoHash className="block text-akatsuki-heading tabular-nums">
                       {status === "scanning"
-                        ? "BUSCANDO DISPOSITIVOS ANDROID EN TU RED WI-FI..."
+                        ? `BUSCANDO DISPOSITIVOS EN TU RED WI-FI (${scanRemainingSeconds || 10}S)...`
                         : "NO SE DETECTARON DISPOSITIVOS AUTOMÁTICAMENTE"}
                     </MonoHash>
                     <BodyText className="text-xs text-akatsuki-muted">
-                      Asegúrate de que la aplicación en tu celular Android esté activa en la misma
-                      red Wi-Fi o ingresa su dirección IP y puerto en el panel derecho.
+                      Asegúrate de que la aplicación en tu celular Android esté
+                      activa en la misma red Wi-Fi o ingresa su dirección IP y
+                      puerto en el panel derecho.
                     </BodyText>
                   </div>
                 ) : (
@@ -200,7 +222,9 @@ export const ConnectionRadarModal: React.FC = () => {
                           setSelectedFingerprint(dev.tlsCertFingerprintSha256);
                         }}
                         className={`p-3 bg-akatsuki-mantle cursor-pointer transition-[transform,background-color] duration-150 hover:translate-x-1 cyber-chamfer-sm hover-cyber-border-crimson flex flex-col gap-1.5 ${
-                          isSelected ? "cyber-border-crimson" : "cyber-border-subtle"
+                          isSelected
+                            ? "cyber-border-crimson"
+                            : "cyber-border-subtle"
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -217,7 +241,9 @@ export const ConnectionRadarModal: React.FC = () => {
                           <MonoTelemetry>
                             {dev.ipAddress}:{dev.port}
                           </MonoTelemetry>
-                          <span className="text-mono-hash text-akatsuki-muted">{dev.model}</span>
+                          <span className="text-mono-hash text-akatsuki-muted">
+                            {dev.model}
+                          </span>
                         </div>
 
                         <div className="pt-1 border-t border-white/5 flex items-center gap-1.5">
@@ -241,8 +267,9 @@ export const ConnectionRadarModal: React.FC = () => {
                   </span>
                 </div>
                 <BodyText className="text-xs text-akatsuki-muted">
-                  La transferencia entre tu computadora y tu celular Android está protegida con
-                  cifrado de extremo a extremo y validación automática de integridad en cada archivo.
+                  La transferencia entre tu computadora y tu celular Android
+                  está protegida con cifrado de extremo a extremo y validación
+                  automática de integridad en cada archivo.
                 </BodyText>
               </div>
             </div>
@@ -261,7 +288,9 @@ export const ConnectionRadarModal: React.FC = () => {
                     size="sm"
                     onClick={handleProbeHealth}
                     disabled={probingHealth}
-                    leftIcon={<Activity className="w-3.5 h-3.5 text-akatsuki-cyan" />}
+                    leftIcon={
+                      <Activity className="w-3.5 h-3.5 text-akatsuki-cyan" />
+                    }
                   >
                     {probingHealth ? "Verificando..." : "Verificar IP"}
                   </CyberButton>
@@ -270,7 +299,7 @@ export const ConnectionRadarModal: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2">
                   <div className="col-span-2">
                     <CyberInput
-                      label="IP del Celular Android"
+                      label="IP Dispositivo"
                       value={ipAddress}
                       onChange={(e) => setIpAddress(e.target.value)}
                       mono
@@ -307,8 +336,9 @@ export const ConnectionRadarModal: React.FC = () => {
                       Sincronización Rápida QR
                     </span>
                     <p className="text-[11px] text-akatsuki-muted leading-tight">
-                      Escanea este código desde la aplicación de tu celular Android o ingresa el
-                      código PIN para vincular ambos equipos.
+                      Escanea este código desde la aplicación de tu celular
+                      Android o ingresa el código PIN para vincular ambos
+                      equipos.
                     </p>
                   </div>
                 </div>
@@ -330,7 +360,9 @@ export const ConnectionRadarModal: React.FC = () => {
                 leftIcon={<Link2 className="w-4 h-4" />}
                 disabled={status === "pairing"}
               >
-                {status === "pairing" ? "Conectando con Android..." : "Conectar Dispositivo"}
+                {status === "pairing"
+                  ? "Conectando con Android..."
+                  : "Conectar Dispositivo"}
               </CyberButton>
             </form>
           </div>

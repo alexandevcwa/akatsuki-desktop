@@ -11,7 +11,10 @@ const DEFAULT_ANDROID_PORT: u16 = 8443;
 /// Obtiene la dirección IPv4 local de la interfaz de red activa del equipo sin enviar tráfico externo.
 fn detect_local_ipv4() -> Option<[u8; 4]> {
     let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
-    socket.connect("192.168.1.1:80").ok()?;
+    socket
+        .connect("8.8.8.8:80")
+        .or_else(|_| socket.connect("192.168.1.1:80"))
+        .ok()?;
     match socket.local_addr().ok()?.ip() {
         IpAddr::V4(ipv4) => Some(ipv4.octets()),
         IpAddr::V6(_) => None,
@@ -36,8 +39,8 @@ pub async fn discover_android_nodes_on_lan() -> Vec<AndroidDeviceNode> {
         let candidate_ip = format!("{}.{}", prefix, host);
         set.spawn(async move {
             let addr = format!("{}:{}", candidate_ip, DEFAULT_ANDROID_PORT);
-            // Sonda TCP ultrarrápida (180ms) antes de ejecutar el handshake HTTPS
-            let tcp_ok = timeout(Duration::from_millis(180), TcpStream::connect(&addr))
+            // Sonda TCP tolerante a latencia Wi-Fi en Android (500ms) antes del handshake HTTPS
+            let tcp_ok = timeout(Duration::from_millis(500), TcpStream::connect(&addr))
                 .await
                 .map(|r| r.is_ok())
                 .unwrap_or(false);
