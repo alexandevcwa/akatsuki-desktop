@@ -1,5 +1,16 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Radio, ShieldCheck, Smartphone, Unplug, Cpu } from "lucide-react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  Radio,
+  ShieldCheck,
+  Smartphone,
+  Unplug,
+  Cpu,
+  Minus,
+  Square,
+  Copy,
+  X,
+} from "lucide-react";
 import {
   AkatsukiCloudIcon,
   CyberButton,
@@ -84,7 +95,7 @@ export const App: React.FC = () => {
         setLoadingAndroid(false);
       }
     },
-    [activeSession]
+    [activeSession],
   );
 
   useEffect(() => {
@@ -189,29 +200,85 @@ export const App: React.FC = () => {
     }
   };
 
+  // Estado de ventana maximizada (Linux Wayland/X11, Windows, macOS)
+  const [isMaximized, setIsMaximized] = useState<boolean>(false);
+
+  const syncMaximizedState = useCallback(async () => {
+    try {
+      const maximized = await getCurrentWindow().isMaximized();
+      setIsMaximized(maximized);
+    } catch {
+      // Ignorar si se ejecuta fuera de contexto de ventana nativa
+    }
+  }, []);
+
+  const handleWindowMinimize = async () => {
+    await getCurrentWindow().minimize();
+  };
+
+  const handleWindowToggleMaximize = async () => {
+    const win = getCurrentWindow();
+    await win.toggleMaximize();
+    const maximized = await win.isMaximized();
+    setIsMaximized(maximized);
+  };
+
+  const handleWindowClose = async () => {
+    await getCurrentWindow().close();
+  };
+
+  const handleHeaderMouseDown = async (e: React.MouseEvent<HTMLElement>) => {
+    // Evitar arrastrar si el clic ocurrió dentro de un botón o elemento interactivo
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("[data-no-drag]")) {
+      return;
+    }
+    if (e.buttons === 1) {
+      if (e.detail === 2) {
+        await handleWindowToggleMaximize();
+      } else {
+        await getCurrentWindow().startDragging();
+      }
+    }
+  };
+
+  useEffect(() => {
+    syncMaximizedState();
+  }, [syncMaximizedState]);
+
   const isConnected = status === "connected" && activeSession !== null;
 
   return (
-    <div className="h-screen w-screen bg-akatsuki-void cyber-grid-bg flex flex-col overflow-hidden select-none">
+    <div className="h-screen w-screen bg-akatsuki-void cyber-grid-bg border border-white/10 flex flex-col overflow-hidden select-none">
       {/* ===================================================================
-       * TOPBAR TÁCTICO HUD (AKATSUKI CYBERPUNK)
+       * TOPBAR TÁCTICO HUD + BARRA DE VENTANA PERSONALIZADA (SIN DECORACIÓN OS)
        * =================================================================== */}
-      <header className="h-16 px-5 bg-akatsuki-mantle/95 border-b border-white/10 flex items-center justify-between gap-4 shrink-0">
+      <header
+        data-tauri-drag-region
+        onMouseDown={handleHeaderMouseDown}
+        className="h-16 px-5 bg-akatsuki-mantle/95 border-b border-white/10 flex items-center justify-between gap-4 shrink-0 cursor-default"
+      >
         {/* Identidad Visual Akatsuki */}
-        <div className="flex items-center gap-3.5">
-          <div className="p-2 bg-akatsuki-panel cyber-chamfer-sm cyber-border-crimson flex items-center justify-center">
+        <div data-tauri-drag-region className="flex items-center gap-3.5">
+          <div className="p-2 bg-akatsuki-panel cyber-chamfer-sm cyber-border-crimson flex items-center justify-center pointer-events-none">
             <AkatsukiCloudIcon className="w-8 h-5" />
           </div>
-          <Heading1 className="tracking-widest">
+          <Heading1
+            data-tauri-drag-region
+            className="tracking-widest pointer-events-none"
+          >
             Akatsuki // Shinobi Secure File Transfer
           </Heading1>
         </div>
 
-        {/* Panel Derecho: Indicador Táctico de Estado + Acción de Conexión */}
+        {/* Panel Derecho: Indicador Táctico de Estado + Acción de Conexión + Controles de Ventana */}
         <div className="flex items-center gap-3">
           {/* Indicador Táctico HUD de Estado con el Dispositivo Móvil */}
           {isConnected && activeSession ? (
-            <div className="flex items-center gap-3 px-3.5 py-1.5 bg-gradient-to-r from-akatsuki-panel via-akatsuki-mantle to-emerald-950/40 cyber-chamfer-sm cyber-border-success">
+            <div
+              data-no-drag
+              className="flex items-center gap-3 px-3.5 py-1.5 bg-gradient-to-r from-akatsuki-panel via-akatsuki-mantle to-emerald-950/40 cyber-chamfer-sm cyber-border-success"
+            >
               {/* Faro / Beacon de Enlace Activo */}
               <div className="relative flex items-center justify-center w-6 h-6 bg-akatsuki-success/15 border border-akatsuki-success/40 rounded-sm">
                 <span className="absolute inset-0 rounded-sm bg-akatsuki-success/25 animate-ping" />
@@ -227,14 +294,19 @@ export const App: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-2 mt-1">
                   <MonoTelemetry className="text-[11px] leading-none">
-                    https://{activeSession.device.ipAddress}:{activeSession.device.port}
+                    https://{activeSession.device.ipAddress}:
+                    {activeSession.device.port}
                   </MonoTelemetry>
                   <span className="text-white/20 text-[10px]">•</span>
                   <span className="hidden xl:inline-flex items-center gap-1 text-[10px] font-mono text-purple-300">
                     <ShieldCheck className="w-3 h-3 text-akatsuki-purple" />
-                    {formatShortSha256(activeSession.device.tlsCertFingerprintSha256)}
+                    {formatShortSha256(
+                      activeSession.device.tlsCertFingerprintSha256,
+                    )}
                   </span>
-                  <span className="hidden sm:inline text-white/20 text-[10px]">•</span>
+                  <span className="hidden sm:inline text-white/20 text-[10px]">
+                    •
+                  </span>
                   <MonoHash className="hidden sm:inline text-[10px] leading-none">
                     LIBRE: {formatBytes(activeSession.androidStorageFreeBytes)}
                   </MonoHash>
@@ -243,6 +315,7 @@ export const App: React.FC = () => {
             </div>
           ) : (
             <div
+              data-no-drag
               onClick={() => setRadarModalOpen(true)}
               title="Haz clic para vincular tu dispositivo Android"
               className="group flex items-center gap-3 px-3.5 py-1.5 bg-gradient-to-r from-akatsuki-panel via-akatsuki-mantle to-amber-950/30 cyber-chamfer-sm cyber-border-warning hover-cyber-border-crimson cursor-pointer transition-all"
@@ -283,6 +356,43 @@ export const App: React.FC = () => {
               Conectar Android
             </CyberButton>
           )}
+
+          {/* Separador Vertical */}
+          <div className="h-6 w-[1px] bg-white/15 mx-1" />
+
+          {/* Controles Nativos de Ventana (Minimizar, Maximizar/Restaurar, Cerrar) */}
+          <div data-no-drag className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleWindowMinimize}
+              title="Minimizar ventana"
+              className="w-8 h-8 bg-akatsuki-panel cyber-chamfer-sm cyber-border-subtle hover:bg-akatsuki-elevated hover-cyber-border-cyan flex items-center justify-center text-akatsuki-body hover:text-akatsuki-cyan transition-colors cursor-pointer"
+            >
+              <Minus className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleWindowToggleMaximize}
+              title={isMaximized ? "Restaurar ventana" : "Maximizar ventana"}
+              className="w-8 h-8 bg-akatsuki-panel cyber-chamfer-sm cyber-border-subtle hover:bg-akatsuki-elevated hover-cyber-border-cyan flex items-center justify-center text-akatsuki-body hover:text-akatsuki-cyan transition-colors cursor-pointer"
+            >
+              {isMaximized ? (
+                <Copy className="w-3.5 h-3.5 rotate-180" />
+              ) : (
+                <Square className="w-3.5 h-3.5" />
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleWindowClose}
+              title="Cerrar aplicación"
+              className="w-8 h-8 bg-akatsuki-primary-muted/70 cyber-chamfer-sm cyber-border-crimson hover:bg-akatsuki-danger hover-cyber-border-crimson flex items-center justify-center text-akatsuki-accent hover:text-akatsuki-heading transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 
@@ -294,7 +404,7 @@ export const App: React.FC = () => {
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <FilePane
             side="pc"
-            title="NODO LOCAL // COMPUTADORA"
+            title="NODO LOCAL"
             badgeLabel={localHostname}
             currentPath={localPath || "~"}
             entries={localEntries}
@@ -311,7 +421,7 @@ export const App: React.FC = () => {
 
           <FilePane
             side="android"
-            title="NODO REMOTO // ANDROID WEB SERVICE"
+            title="NODO REMOTO"
             currentPath={androidPath}
             entries={androidEntries}
             loading={loadingAndroid}
