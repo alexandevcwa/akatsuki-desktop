@@ -141,7 +141,7 @@ export const App: React.FC = () => {
         </div>
 
         {/* Telemetría Central de Enlace Android */}
-        <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 bg-akatsuki-panel/90 border border-white/10 rounded-sm">
+        <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 bg-akatsuki-panel/90 border border-b-0 border-white/10 rounded-t-sm">
           {isConnected && activeSession ? (
             <>
               <CyberBadge tone="success" pulse>
