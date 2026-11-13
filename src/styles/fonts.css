@@ -1,0 +1,120 @@
+/* ============================================================================
+ * TIPOGRAFÍAS LOCALES EMPACADAS (100% OFFLINE / CERO LATENCIA DE RED)
+ * Familias: Orbitron, Rajdhani, Plus Jakarta Sans, JetBrains Mono
+ * ============================================================================ */
+
+/* 1. ORBITRON (Display / Títulos Principales y Botones HUD) */
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("/fonts/orbitron-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/orbitron-700.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Orbitron";
+  font-style: normal;
+  font-weight: 800;
+  font-display: block;
+  src: url("/fonts/orbitron-800.woff2") format("woff2");
+}
+
+/* 2. RAJDHANI (Subtítulos Tácticos / Cabeceras de Tabla) */
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("/fonts/rajdhani-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("/fonts/rajdhani-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Rajdhani";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/rajdhani-700.woff2") format("woff2");
+}
+
+/* 3. PLUS JAKARTA SANS (Cuerpo de Interfaz y Nombres de Archivos en Listas) */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/plus-jakarta-sans-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("/fonts/plus-jakarta-sans-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("/fonts/plus-jakarta-sans-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/plus-jakarta-sans-700.woff2") format("woff2");
+}
+
+/* 4. JETBRAINS MONO (Telemetría, Fechas Tabulares, Pesos, IPs y Hashes SHA-256) */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url("/fonts/jetbrains-mono-400.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url("/fonts/jetbrains-mono-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url("/fonts/jetbrains-mono-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url("/fonts/jetbrains-mono-700.woff2") format("woff2");
+}

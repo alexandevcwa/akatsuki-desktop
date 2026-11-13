@@ -65,12 +65,17 @@ El código fuente sigue una separación estricta entre el núcleo de infraestruc
 akatsuki-desktop/
 ├── docs/
 │   └── AKATSUKI_DESIGN_AND_ANDROID_API_SPEC.md  # Especificación técnica del protocolo y diseño
+├── public/
+│   └── fonts/                                   # Fuentes locales WOFF2 (Orbitron, Rajdhani, Plus Jakarta Sans, JetBrains Mono)
 ├── scripts/
+│   ├── build-windows.ps1                        # Script nativo de compilación e instaladores para Windows
+│   ├── build-windows-from-linux.sh              # Script de compilación cruzada Linux -> Windows
 │   └── install-manjaro.sh                       # Script de compilación e instalación para Manjaro Linux
 ├── src/                                         # Capa de Presentación (React + TypeScript)
 │   ├── assets/
 │   │   └── akatsuki-logo.png                    # Activo gráfico de identidad visual
 │   ├── styles/
+│   │   ├── fonts.css                            # Declaraciones @font-face locales (100% offline)
 │   │   ├── tokens.css                           # Variables CSS de paleta de colores y tipografía
 │   │   └── globals.css                          # Geometría poligonal, animaciones GPU y utilidades
 │   ├── design-system/
