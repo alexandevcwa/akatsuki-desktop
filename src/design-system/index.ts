@@ -4,3 +4,4 @@ export * from "./components/CyberButton";
 export * from "./components/CyberPanel";
 export * from "./components/CyberBadge";
 export * from "./components/CyberInput";
+export * from "./components/CyberConfirmDialog";
