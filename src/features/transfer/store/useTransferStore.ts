@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { FileEntry, TransferDirection, TransferTask } from "@/shared/types/protocol";
+import { joinPath } from "@/shared/utils/path";
 import { executeFileTransfer } from "../services/transferIpc";
 
 interface TransferStore {
@@ -27,9 +28,7 @@ export const useTransferStore = create<TransferStore>((set) => ({
     bearerToken,
   }) => {
     const taskId = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const sep =
-      direction === "android_to_pc" && destinationDir.includes("\\") ? "\\" : "/";
-    const destPath = `${destinationDir.replace(/[\\/]+$/, "")}${sep}${file.name}`;
+    const destPath = joinPath(destinationDir, file.name);
 
     const newTask: TransferTask = {
       id: taskId,
