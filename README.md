@@ -268,3 +268,49 @@ Opciones adicionales del script de instalación:
 Una vez completada la instalación, el ejecutable nativo queda disponible tanto en el lanzador de aplicaciones del sistema como en:
 - `~/.local/bin/akatsuki-desktop`
 - `./dist-linux/akatsuki-desktop`
+
+### 8.4 Compilación y Generación de Instaladores para Windows (NSIS y MSI)
+
+El proyecto cuenta con soporte completo para la generación de paquetes de instalación en Windows 10/11 (`x86_64-pc-windows-msvc`), incluyendo:
+- **Instalador NSIS (`*-setup.exe`)**: Comprimido mediante algoritmo `LZMA`, con soporte multilenguaje (Español e Inglés), gráficos personalizados de cabecera/lateral, instalación silenciosa automática del runtime **Microsoft Edge WebView2** (`downloadBootstrapper`) y modalidad dual (`both`: por usuario actual sin requerir privilegios de administrador o para todos los usuarios del equipo).
+- **Instalador Empresarial WiX (`*.msi`)**: Paquete estándar de Windows Installer configurado en español (`es-ES`).
+- **Ejecutable Portable (`akatsuki-desktop-portable-x64.exe`)**: Binario autónomo optimizado con `LTO` (*Link-Time Optimization*), eliminación de símbolos (`strip = true`) y subsistema gráfico nativo (`windows_subsystem = "windows"`).
+
+#### Opción A: Compilación Nativa desde Windows 10/11 (PowerShell)
+Requiere tener instalado Node.js LTS, Rust (`rustup` con toolchain MSVC) y Visual Studio C++ Build Tools:
+
+```powershell
+# Generar todos los paquetes (Instalador NSIS .exe + Instalador WiX .msi + Ejecutable Portable .exe)
+.\scripts\build-windows.ps1
+
+# Generar únicamente el instalador NSIS (.exe)
+.\scripts\build-windows.ps1 -Target nsis
+
+# Generar únicamente el instalador MSI (.msi)
+.\scripts\build-windows.ps1 -Target msi
+
+# Limpiar compilaciones previas y reconstruir todo
+.\scripts\build-windows.ps1 -Target all -Clean
+```
+
+*(También disponible mediante npm en Windows: `npm run build:windows`, `npm run build:windows:nsis`, `npm run build:windows:msi`).*
+
+#### Opción B: Compilación Cruzada hacia Windows desde Manjaro / Arch Linux
+Es posible generar tanto el ejecutable `.exe` como el instalador de Windows `*-setup.exe` directamente desde Manjaro Linux utilizando `cargo-xwin` y `nsis`:
+
+```bash
+# 1. Instalar dependencias de compilación cruzada en Manjaro Linux (solo la primera vez)
+sudo pacman -S --needed clang llvm lld nsis
+cargo install --locked cargo-xwin
+
+# 2. Compilar instalador NSIS (.exe) y binario portable (.exe) para Windows
+./scripts/build-windows-from-linux.sh
+```
+
+*(O mediante npm: `npm run build:windows:cross`).*
+
+#### Opción C: Integración Continua Automatizada (GitHub Actions)
+El flujo de trabajo [`.github/workflows/release-windows.yml`](.github/workflows/release-windows.yml) compila automáticamente en un entorno `windows-latest` los instaladores `.exe` (NSIS), `.msi` (WiX), el binario portable y el archivo de verificación `SHA256SUMS.txt` al publicar una etiqueta de versión (`v*`) o al ejecutarlo manualmente desde la pestaña *Actions*.
+
+Todos los instaladores generados y sus firmas de integridad se almacenan en el directorio `./dist-windows/`.
+

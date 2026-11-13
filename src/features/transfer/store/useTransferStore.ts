@@ -27,7 +27,9 @@ export const useTransferStore = create<TransferStore>((set) => ({
     bearerToken,
   }) => {
     const taskId = `tx-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-    const destPath = `${destinationDir.replace(/\/$/, "")}/${file.name}`;
+    const sep =
+      direction === "android_to_pc" && destinationDir.includes("\\") ? "\\" : "/";
+    const destPath = `${destinationDir.replace(/[\\/]+$/, "")}${sep}${file.name}`;
 
     const newTask: TransferTask = {
       id: taskId,

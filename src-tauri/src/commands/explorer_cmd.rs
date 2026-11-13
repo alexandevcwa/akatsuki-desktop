@@ -10,19 +10,27 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 
 pub fn get_system_hostname() -> String {
+    if let Ok(env_host) = std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")) {
+        let trimmed = env_host.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    #[cfg(target_os = "linux")]
     if let Ok(content) = std::fs::read_to_string("/etc/hostname") {
         let trimmed = content.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
         }
     }
-    if let Ok(env_host) = std::env::var("HOSTNAME").or_else(|_| std::env::var("COMPUTERNAME")) {
-        let trimmed = env_host.trim();
-        if !trimmed.is_empty() {
-            return trimmed.to_string();
-        }
+    let mut cmd = std::process::Command::new("hostname");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
     }
-    if let Ok(output) = std::process::Command::new("hostname").output() {
+    if let Ok(output) = cmd.output() {
         let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
         if !out_str.is_empty() {
             return out_str;
@@ -33,11 +41,16 @@ pub fn get_system_hostname() -> String {
 
 #[tauri::command]
 pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryListing> {
+    let default_root = if cfg!(target_os = "windows") {
+        "C:\\"
+    } else {
+        "/"
+    };
     let target_dir: PathBuf = match path {
         Some(ref p) if !p.trim().is_empty() => PathBuf::from(p),
         _ => dirs::download_dir()
             .or_else(dirs::home_dir)
-            .unwrap_or_else(|| PathBuf::from("/")),
+            .unwrap_or_else(|| PathBuf::from(default_root)),
     };
 
     let mut read_dir = fs::read_dir(&target_dir).await?;

@@ -112,7 +112,25 @@ export const App: React.FC = () => {
   }, [activeSession, androidPath, fetchAndroidDir]);
 
   const navigateUp = (current: string): string => {
-    const clean = current.replace(/\/+$/, "");
+    const trimmed = current.trim();
+    if (!trimmed) return "/";
+
+    // Soporte multiplataforma para rutas de unidades Windows (ej. C:\Users\...)
+    if (/^[a-zA-Z]:/.test(trimmed)) {
+      const sep = trimmed.includes("\\") ? "\\" : "/";
+      const clean = trimmed.replace(/[\\/]+$/, "");
+      if (/^[a-zA-Z]:$/.test(clean)) {
+        return `${clean}${sep}`;
+      }
+      const lastSep = Math.max(clean.lastIndexOf("\\"), clean.lastIndexOf("/"));
+      if (lastSep <= 2) {
+        return `${clean.slice(0, 2)}${sep}`;
+      }
+      return clean.slice(0, lastSep);
+    }
+
+    // Rutas POSIX (Linux, macOS y Android)
+    const clean = trimmed.replace(/\/+$/, "");
     const idx = clean.lastIndexOf("/");
     if (idx <= 0) return "/";
     return clean.slice(0, idx);
@@ -149,7 +167,8 @@ export const App: React.FC = () => {
   };
 
   const handleCreateLocalFolder = async (folderName: string) => {
-    const fullPath = `${localPath.replace(/\/$/, "")}/${folderName}`;
+    const sep = localPath.includes("\\") ? "\\" : "/";
+    const fullPath = `${localPath.replace(/[\\/]+$/, "")}${sep}${folderName}`;
     try {
       await createLocalDirectory(fullPath);
       await fetchLocalDir(localPath);
