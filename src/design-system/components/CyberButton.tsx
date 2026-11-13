@@ -15,8 +15,7 @@ export interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonE
 
 /**
  * Botón oficial del Sistema de Diseño Akatsuki Cyberpunk.
- * Utiliza bordes poligonales de 6 lados para que las esquinas recortadas a 45°
- * se iluminen con el mismo color y grosor que el resto del botón.
+ * Incluye bordes poligonales de 6 lados, barrido de luz (sheen) en hover y física táctil al presionar.
  */
 export const CyberButton: React.FC<CyberButtonProps> = ({
   variant = "primary",
@@ -31,13 +30,13 @@ export const CyberButton: React.FC<CyberButtonProps> = ({
 }) => {
   const variantClasses: Record<CyberButtonVariant, string> = {
     primary:
-      "bg-akatsuki-primary text-akatsuki-heading cyber-border-crimson-glow hover:bg-akatsuki-primary-glow hover-cyber-border-crimson active:scale-[0.99]",
+      "bg-akatsuki-primary text-akatsuki-heading cyber-border-crimson-glow hover:bg-akatsuki-primary-glow hover-cyber-border-crimson hover:shadow-crimson-subtle",
     secondary:
-      "bg-akatsuki-panel text-akatsuki-cyan cyber-border-cyan hover:bg-akatsuki-cyan/15 hover-cyber-border-cyan active:scale-[0.99]",
+      "bg-akatsuki-panel text-akatsuki-cyan cyber-border-cyan hover:bg-akatsuki-cyan/15 hover-cyber-border-cyan hover:shadow-cyan-glow",
     ghost:
       "bg-transparent text-akatsuki-body cyber-border-transparent hover:bg-akatsuki-elevated hover:text-akatsuki-heading hover-cyber-border-subtle",
     danger:
-      "bg-akatsuki-primary-muted text-akatsuki-accent cyber-border-crimson hover:bg-akatsuki-danger hover:text-akatsuki-heading hover-cyber-border-crimson active:scale-[0.99]",
+      "bg-akatsuki-primary-muted text-akatsuki-accent cyber-border-crimson hover:bg-akatsuki-danger hover:text-akatsuki-heading hover-cyber-border-crimson hover:shadow-crimson-subtle",
   };
 
   const sizeClasses: Record<CyberButtonSize, string> = {
@@ -50,7 +49,7 @@ export const CyberButton: React.FC<CyberButtonProps> = ({
       disabled={disabled}
       className={twMerge(
         clsx(
-          "inline-flex items-center justify-center font-display uppercase transition-all duration-150 select-none cursor-pointer",
+          "cyber-btn-sheen inline-flex items-center justify-center font-display uppercase transition-all duration-200 ease-out hover:-translate-y-[1px] active:translate-y-0 active:scale-[0.97] select-none cursor-pointer",
           chamfer ? "cyber-chamfer-sm" : "rounded-sm border",
           variantClasses[variant],
           sizeClasses[size],
@@ -60,9 +59,17 @@ export const CyberButton: React.FC<CyberButtonProps> = ({
       )}
       {...props}
     >
-      {leftIcon && <span className="shrink-0">{leftIcon}</span>}
+      {leftIcon && (
+        <span className="shrink-0 transition-transform duration-200 group-hover:scale-110">
+          {leftIcon}
+        </span>
+      )}
       <span>{children}</span>
-      {rightIcon && <span className="shrink-0">{rightIcon}</span>}
+      {rightIcon && (
+        <span className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5">
+          {rightIcon}
+        </span>
+      )}
     </button>
   );
 };

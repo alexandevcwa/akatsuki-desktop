@@ -71,9 +71,19 @@ export const FilePane: React.FC<FilePaneProps> = ({
   const [pendingAction, setPendingAction] = useState<PendingActionState | null>(null);
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
+  // Estado de sombras dinámicas durante el scroll en la lista
+  const [scrollShadowTop, setScrollShadowTop] = useState(false);
+  const [scrollShadowBottom, setScrollShadowBottom] = useState(false);
+
   const filteredEntries = entries.filter((item) =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    setScrollShadowTop(el.scrollTop > 6);
+    setScrollShadowBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 6);
+  };
 
   const handleConfirmNewFolder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,7 +179,10 @@ export const FilePane: React.FC<FilePaneProps> = ({
           />
 
           {isCreatingFolder && (
-            <form onSubmit={handleConfirmNewFolder} className="flex items-center gap-2">
+            <form
+              onSubmit={handleConfirmNewFolder}
+              className="animate-cyber-slide-down flex items-center gap-2"
+            >
               <CyberInput
                 placeholder="Nombre de la nueva carpeta..."
                 value={newFolderName}
@@ -200,7 +213,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
           )}
 
           {errorMessage && (
-            <div className="px-2.5 py-1.5 bg-akatsuki-primary-muted border border-akatsuki-danger text-[11px] font-mono text-akatsuki-accent">
+            <div className="animate-cyber-slide-down px-2.5 py-1.5 bg-akatsuki-primary-muted border border-akatsuki-danger text-[11px] font-mono text-akatsuki-accent">
               {errorMessage}
             </div>
           )}
@@ -216,51 +229,71 @@ export const FilePane: React.FC<FilePaneProps> = ({
           </div>
         </div>
 
-        {/* Cuerpo de Lista o Estado Desconectado */}
-        <div className="flex-1 overflow-y-auto divide-y divide-white/5">
-          {side === "android" && !connected ? (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4">
-              <div className="w-14 h-14 rounded-full bg-akatsuki-primary-muted/60 border border-akatsuki-primary flex items-center justify-center shadow-crimson-subtle">
-                <ShieldAlert className="w-7 h-7 text-akatsuki-primary-glow" />
+        {/* Cuerpo de Lista con Sombras de Profundidad al Hacer Scroll */}
+        <div className="relative flex-1 min-h-0 flex flex-col">
+          {/* Sombra superior dinámica al hacer scroll hacia abajo */}
+          <div
+            className={`pointer-events-none absolute top-0 inset-x-0 h-4 z-10 bg-gradient-to-b from-black/65 to-transparent transition-opacity duration-200 ${
+              scrollShadowTop ? "opacity-100" : "opacity-0"
+            }`}
+          />
+
+          <div
+            onScroll={handleListScroll}
+            className="flex-1 overflow-y-auto scroll-smooth divide-y divide-white/5"
+          >
+            {side === "android" && !connected ? (
+              <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 animate-cyber-row">
+                <div className="w-14 h-14 rounded-full bg-akatsuki-primary-muted/60 border border-akatsuki-primary flex items-center justify-center shadow-crimson-subtle">
+                  <ShieldAlert className="w-7 h-7 text-akatsuki-primary-glow" />
+                </div>
+                <div className="max-w-sm space-y-1.5">
+                  <p className="font-display text-heading-3 uppercase text-akatsuki-heading">
+                    Sin Enlace al Web Service Android
+                  </p>
+                  <BodyText className="text-xs text-akatsuki-muted">
+                    Inicia el servidor web en tu celular Android y vincúlalo mediante Radar LAN o
+                    dirección IP:Puerto con verificación TLS.
+                  </BodyText>
+                </div>
+                {onOpenConnectModal && (
+                  <CyberButton
+                    variant="primary"
+                    onClick={onOpenConnectModal}
+                    leftIcon={<Radio className="w-4 h-4" />}
+                  >
+                    Vincular Dispositivo Android
+                  </CyberButton>
+                )}
               </div>
-              <div className="max-w-sm space-y-1.5">
-                <p className="font-display text-heading-3 uppercase text-akatsuki-heading">
-                  Sin Enlace al Web Service Android
-                </p>
-                <BodyText className="text-xs text-akatsuki-muted">
-                  Inicia el servidor web en tu celular Android y vincúlalo mediante Radar LAN o
-                  dirección IP:Puerto con verificación TLS.
-                </BodyText>
+            ) : filteredEntries.length === 0 ? (
+              <div className="h-44 flex items-center justify-center animate-cyber-row">
+                <MonoHash>NO SE ENCONTRARON ARCHIVOS EN ESTE DIRECTORIO</MonoHash>
               </div>
-              {onOpenConnectModal && (
-                <CyberButton
-                  variant="primary"
-                  onClick={onOpenConnectModal}
-                  leftIcon={<Radio className="w-4 h-4" />}
-                >
-                  Vincular Dispositivo Android
-                </CyberButton>
-              )}
-            </div>
-          ) : filteredEntries.length === 0 ? (
-            <div className="h-44 flex items-center justify-center">
-              <MonoHash>NO SE ENCONTRARON ARCHIVOS EN ESTE DIRECTORIO</MonoHash>
-            </div>
-          ) : (
-            filteredEntries.map((entry) => (
-              <FileRow
-                key={entry.path}
-                entry={entry}
-                side={side}
-                selected={selectedPath === entry.path}
-                onSelect={() => setSelectedPath(entry.path)}
-                onOpenDir={() => onNavigate(entry.path)}
-                onTransfer={() => setPendingAction({ mode: "transfer", entry })}
-                onDelete={() => setPendingAction({ mode: "delete", entry })}
-                canTransfer={connected}
-              />
-            ))
-          )}
+            ) : (
+              filteredEntries.map((entry, idx) => (
+                <FileRow
+                  key={entry.path}
+                  index={idx}
+                  entry={entry}
+                  side={side}
+                  selected={selectedPath === entry.path}
+                  onSelect={() => setSelectedPath(entry.path)}
+                  onOpenDir={() => onNavigate(entry.path)}
+                  onTransfer={() => setPendingAction({ mode: "transfer", entry })}
+                  onDelete={() => setPendingAction({ mode: "delete", entry })}
+                  canTransfer={connected}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Sombra inferior dinámica mientras haya más elementos abajo */}
+          <div
+            className={`pointer-events-none absolute bottom-0 inset-x-0 h-5 z-10 bg-gradient-to-t from-black/65 to-transparent transition-opacity duration-200 ${
+              scrollShadowBottom ? "opacity-100" : "opacity-0"
+            }`}
+          />
         </div>
       </CyberPanel>
 

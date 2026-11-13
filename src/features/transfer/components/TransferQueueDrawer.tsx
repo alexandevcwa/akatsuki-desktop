@@ -44,9 +44,9 @@ export const TransferQueueDrawer: React.FC = () => {
         </div>
       }
     >
-      <div className="flex-1 overflow-y-auto divide-y divide-white/5 px-3 py-1.5">
+      <div className="flex-1 overflow-y-auto scroll-smooth divide-y divide-white/5 px-3 py-1.5">
         {tasks.length === 0 ? (
-          <div className="h-full flex items-center justify-between px-2 text-akatsuki-muted">
+          <div className="h-full flex items-center justify-between px-2 text-akatsuki-muted animate-cyber-row">
             <MonoHash>
               CANAL DE TRANSFERENCIA INACTIVO // SELECCIONA "ENVIAR" O "RECIBIR" EN CUALQUIER ARCHIVO
             </MonoHash>
@@ -60,7 +60,7 @@ export const TransferQueueDrawer: React.FC = () => {
                 : 0;
 
             return (
-              <div key={task.id} className="py-2 flex flex-col gap-1.5">
+              <div key={task.id} className="animate-cyber-slide-down py-2 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2 min-w-0">
                     {task.direction === "pc_to_android" ? (

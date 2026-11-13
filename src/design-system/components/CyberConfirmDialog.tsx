@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
 import { AlertTriangle, ArrowRightLeft, Trash2, X } from "lucide-react";
+import { useAnimatedPresence } from "@/shared/utils/useAnimatedPresence";
 import { CyberPanel } from "./CyberPanel";
 import { CyberButton } from "./CyberButton";
 import { CyberBadge } from "./CyberBadge";
@@ -24,8 +25,7 @@ export interface CyberConfirmDialogProps {
 }
 
 /**
- * Modal táctico de confirmación Akatsuki Cyberpunk para proteger operaciones críticas
- * como eliminación permanente de archivos/directorios y envío/recepción de archivos.
+ * Modal táctico de confirmación Akatsuki Cyberpunk con animación fluida de entrada y salida.
  */
 export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
   open,
@@ -44,6 +44,8 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const { shouldRender, isClosing } = useAnimatedPresence(open, 200);
+
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -55,7 +57,7 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [open, isProcessing, onCancel]);
 
-  if (!open) return null;
+  if (!shouldRender) return null;
 
   const isDelete = mode === "delete";
 
@@ -64,11 +66,15 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
       onClick={() => {
         if (!isProcessing) onCancel();
       }}
-      className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 ${
+        isClosing ? "animate-cyber-backdrop-out" : "animate-cyber-backdrop-in"
+      }`}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg"
+        className={`w-full max-w-lg ${
+          isClosing ? "animate-cyber-modal-out" : "animate-cyber-modal-in"
+        }`}
       >
         <CyberPanel
           title={title}

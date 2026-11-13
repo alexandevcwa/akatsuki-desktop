@@ -43,8 +43,7 @@
   pointer-events: none;
   z-index: 20;
   background-color: var(--cyber-border);
-  transition: background-color 150ms ease;
-  /* Polígono continuo exterior -> interior (espesor uniforme de 1.5px en los 6 lados) */
+  transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
   clip-path: polygon(
     0 0,
     calc(100% - 9px) 0,
@@ -84,8 +83,7 @@
   pointer-events: none;
   z-index: 20;
   background-color: var(--cyber-border);
-  transition: background-color 150ms ease;
-  /* Polígono continuo exterior -> interior (espesor uniforme de 1.5px en los 6 lados) */
+  transition: background-color 180ms cubic-bezier(0.22, 1, 0.36, 1);
   clip-path: polygon(
     0 0,
     calc(100% - 14px) 0,
@@ -149,6 +147,125 @@
   --cyber-border: rgba(255, 255, 255, 0.28);
 }
 
+/* ============================================================================
+ * SISTEMA DE ANIMACIONES TÁCTICAS (MODALES, LISTAS, BOTONES Y SCROLL)
+ * ============================================================================ */
+@keyframes cyberBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cyberBackdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes cyberModalIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.93) translateY(14px);
+    filter: brightness(1.35);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: brightness(1);
+  }
+}
+
+@keyframes cyberModalOut {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+}
+
+@keyframes cyberRowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes cyberSlideDownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-cyber-backdrop-in {
+  animation: cyberBackdropIn 220ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.animate-cyber-backdrop-out {
+  animation: cyberBackdropOut 200ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.animate-cyber-modal-in {
+  animation: cyberModalIn 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-cyber-modal-out {
+  animation: cyberModalOut 190ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.animate-cyber-row {
+  animation: cyberRowIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-cyber-slide-down {
+  animation: cyberSlideDownIn 180ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Destello táctico al pasar el cursor sobre botones */
+.cyber-btn-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-btn-sheen::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 65%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.16),
+    transparent
+  );
+  transform: skewX(-24deg);
+  transition: left 380ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+
+.cyber-btn-sheen:hover::before {
+  left: 140%;
+}
+
 /* Utilidades Cyberpunk HUD adicionales */
 @layer utilities {
   .cyber-grid-bg {
@@ -170,7 +287,7 @@
   }
 }
 
-/* Scrollbars estilizados Akatsuki */
+/* Scrollbars estilizados Akatsuki con transición suave */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -183,6 +300,7 @@
 ::-webkit-scrollbar-thumb {
   background: #292d45;
   border-radius: 2px;
+  transition: background-color 180ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
