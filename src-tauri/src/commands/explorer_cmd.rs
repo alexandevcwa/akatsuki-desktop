@@ -5,6 +5,28 @@ use chrono::{DateTime, Local};
 use std::path::PathBuf;
 use tokio::fs;
 
+fn get_system_hostname() -> String {
+    if let Ok(content) = std::fs::read_to_string("/etc/hostname") {
+        let trimmed = content.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    if let Ok(env_host) = std::env::var("HOSTNAME").or_else(|_| std::env::var("COMPUTERNAME")) {
+        let trimmed = env_host.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+    if let Ok(output) = std::process::Command::new("hostname").output() {
+        let out_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if !out_str.is_empty() {
+            return out_str;
+        }
+    }
+    "LOCAL-HOST".to_string()
+}
+
 #[tauri::command]
 pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryListing> {
     let target_dir: PathBuf = match path {
@@ -65,6 +87,7 @@ pub async fn list_local_dir(path: Option<String>) -> AkatsukiResult<DirectoryLis
 
     Ok(DirectoryListing {
         current_path: target_dir.to_string_lossy().to_string(),
+        hostname: Some(get_system_hostname()),
         entries,
     })
 }

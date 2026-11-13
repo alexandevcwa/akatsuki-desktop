@@ -22,6 +22,7 @@ import { FileRow } from "./FileRow";
 interface FilePaneProps {
   side: "pc" | "android";
   title: string;
+  badgeLabel?: string;
   currentPath: string;
   entries: FileEntry[];
   loading: boolean;
@@ -36,6 +37,7 @@ interface FilePaneProps {
 export const FilePane: React.FC<FilePaneProps> = ({
   side,
   title,
+  badgeLabel,
   currentPath,
   entries,
   loading,
@@ -73,7 +75,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
             }
           >
             {side === "pc"
-              ? "MANJARO LOCAL FS"
+              ? badgeLabel || "LOCAL HOST"
               : connected
               ? "HTTPS STREAM READY"
               : "DESCONECTADO"}

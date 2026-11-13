@@ -107,6 +107,7 @@ pub async fn fetch_android_directory(
 
     Ok(DirectoryListing {
         current_path: clean_path.to_string(),
+        hostname: None,
         entries: vec![
             FileEntry {
                 name: "DCIM".to_string(),

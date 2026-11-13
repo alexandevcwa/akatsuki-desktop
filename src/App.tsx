@@ -1,10 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import {
-  Radio,
-  ShieldCheck,
-  Unplug,
-  Cpu,
-} from "lucide-react";
+import { Radio, ShieldCheck, Unplug, Cpu } from "lucide-react";
 import {
   AkatsukiCloudIcon,
   CyberBadge,
@@ -26,17 +21,14 @@ import { FileEntry } from "@/shared/types/protocol";
 import { formatBytes, formatShortSha256 } from "@/shared/utils/formatters";
 
 export const App: React.FC = () => {
-  const {
-    status,
-    activeSession,
-    setRadarModalOpen,
-    disconnect,
-  } = useConnectionStore();
+  const { status, activeSession, setRadarModalOpen, disconnect } =
+    useConnectionStore();
 
   const { enqueueTransfer } = useTransferStore();
 
-  // Estado del explorador local (PC - Manjaro Linux)
+  // Estado del explorador local (PC)
   const [localPath, setLocalPath] = useState<string>("");
+  const [localHostname, setLocalHostname] = useState<string>("");
   const [localEntries, setLocalEntries] = useState<FileEntry[]>([]);
   const [loadingLocal, setLoadingLocal] = useState<boolean>(false);
 
@@ -50,6 +42,9 @@ export const App: React.FC = () => {
     try {
       const res = await listLocalDirectory(targetPath);
       setLocalPath(res.currentPath);
+      if (res.hostname) {
+        setLocalHostname(res.hostname);
+      }
       setLocalEntries(res.entries);
     } finally {
       setLoadingLocal(false);
@@ -73,7 +68,7 @@ export const App: React.FC = () => {
         setLoadingAndroid(false);
       }
     },
-    [activeSession]
+    [activeSession],
   );
 
   useEffect(() => {
@@ -148,13 +143,17 @@ export const App: React.FC = () => {
                 {activeSession.device.deviceName}
               </CyberBadge>
               <MonoTelemetry>
-                https://{activeSession.device.ipAddress}:{activeSession.device.port}
+                https://{activeSession.device.ipAddress}:
+                {activeSession.device.port}
               </MonoTelemetry>
               <div className="h-3 w-[1px] bg-white/15" />
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-akatsuki-purple" />
                 <MonoHash>
-                  PINNED: {formatShortSha256(activeSession.device.tlsCertFingerprintSha256)}
+                  PINNED:{" "}
+                  {formatShortSha256(
+                    activeSession.device.tlsCertFingerprintSha256,
+                  )}
                 </MonoHash>
               </div>
               <div className="h-3 w-[1px] bg-white/15" />
@@ -206,8 +205,9 @@ export const App: React.FC = () => {
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-4">
           <FilePane
             side="pc"
-            title="NODO LOCAL // COMPUTADORA (LINUX)"
-            currentPath={localPath || "/home/rmachicm"}
+            title="NODO LOCAL"
+            badgeLabel={localHostname}
+            currentPath={localPath || "~"}
             entries={localEntries}
             loading={loadingLocal}
             connected={isConnected}
@@ -219,7 +219,7 @@ export const App: React.FC = () => {
 
           <FilePane
             side="android"
-            title="NODO REMOTO // ANDROID WEB SERVICE"
+            title="NODO REMOTO"
             currentPath={androidPath}
             entries={androidEntries}
             loading={loadingAndroid}

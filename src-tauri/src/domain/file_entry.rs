@@ -15,5 +15,6 @@ pub struct FileEntry {
 #[serde(rename_all = "camelCase")]
 pub struct DirectoryListing {
     pub current_path: String,
+    pub hostname: Option<String>,
     pub entries: Vec<FileEntry>,
 }
