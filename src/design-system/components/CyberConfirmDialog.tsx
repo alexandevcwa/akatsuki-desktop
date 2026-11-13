@@ -25,7 +25,7 @@ export interface CyberConfirmDialogProps {
 }
 
 /**
- * Modal táctico de confirmación Akatsuki Cyberpunk con animación fluida de entrada y salida.
+ * Modal táctico de confirmación Akatsuki Cyberpunk optimizado para GPU (sin backdrop-blur costoso).
  */
 export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
   open,
@@ -44,7 +44,7 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const { shouldRender, isClosing } = useAnimatedPresence(open, 200);
+  const { shouldRender, isClosing } = useAnimatedPresence(open, 140);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +66,7 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
       onClick={() => {
         if (!isProcessing) onCancel();
       }}
-      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 ${
+      className={`fixed inset-0 z-50 bg-[#05050A]/88 flex items-center justify-center p-4 ${
         isClosing ? "animate-cyber-backdrop-out" : "animate-cyber-backdrop-in"
       }`}
     >
@@ -80,7 +80,6 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
           title={title}
           subtitle={subtitle}
           accentColor={isDelete ? "crimson" : "cyan"}
-          className="shadow-crimson-glow"
           headerRight={
             <CyberButton
               variant="ghost"

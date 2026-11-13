@@ -81,8 +81,10 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
   const handleListScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
-    setScrollShadowTop(el.scrollTop > 6);
-    setScrollShadowBottom(el.scrollHeight - el.scrollTop - el.clientHeight > 6);
+    const hasTop = el.scrollTop > 6;
+    const hasBottom = el.scrollHeight - el.scrollTop - el.clientHeight > 6;
+    if (hasTop !== scrollShadowTop) setScrollShadowTop(hasTop);
+    if (hasBottom !== scrollShadowBottom) setScrollShadowBottom(hasBottom);
   };
 
   const handleConfirmNewFolder = async (e: React.FormEvent) => {
@@ -240,7 +242,7 @@ export const FilePane: React.FC<FilePaneProps> = ({
 
           <div
             onScroll={handleListScroll}
-            className="flex-1 overflow-y-auto scroll-smooth divide-y divide-white/5"
+            className="cyber-scroll-container flex-1 overflow-y-auto divide-y divide-white/5"
           >
             {side === "android" && !connected ? (
               <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-4 animate-cyber-row">

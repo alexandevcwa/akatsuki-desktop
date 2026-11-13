@@ -1,36 +1,26 @@
 import { useEffect, useState } from "react";
 
 /**
- * Controla el ciclo de vida de montaje y desmontaje animado para modales y paneles desplegables.
- * Permite reproducir la animación de salida (`exiting`) antes de desmontar el nodo del DOM.
+ * Controla el ciclo de vida de montaje y desmontaje animado a 60/144 FPS sin bloqueos de doble render.
  */
-export function useAnimatedPresence(isOpen: boolean, durationMs = 220) {
+export function useAnimatedPresence(isOpen: boolean, exitDurationMs = 150) {
   const [shouldRender, setShouldRender] = useState(isOpen);
-  const [stage, setStage] = useState<"entering" | "entered" | "exiting">(
-    isOpen ? "entered" : "exiting"
-  );
 
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true);
-      const raf = requestAnimationFrame(() => {
-        setStage("entering");
-        const enterTimer = setTimeout(() => setStage("entered"), durationMs);
-        return () => clearTimeout(enterTimer);
-      });
-      return () => cancelAnimationFrame(raf);
-    } else if (shouldRender) {
-      setStage("exiting");
-      const exitTimer = setTimeout(() => {
-        setShouldRender(false);
-      }, durationMs);
-      return () => clearTimeout(exitTimer);
+      return;
     }
-  }, [isOpen, durationMs, shouldRender]);
+    if (shouldRender) {
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, exitDurationMs);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, exitDurationMs, shouldRender]);
 
   return {
-    shouldRender,
-    isClosing: stage === "exiting",
-    stage,
+    shouldRender: isOpen || shouldRender,
+    isClosing: !isOpen && shouldRender,
   };
 }

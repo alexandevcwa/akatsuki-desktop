@@ -35,7 +35,7 @@ export const ConnectionRadarModal: React.FC = () => {
     errorMessage,
   } = useConnectionStore();
 
-  const { shouldRender, isClosing } = useAnimatedPresence(isRadarModalOpen, 200);
+  const { shouldRender, isClosing } = useAnimatedPresence(isRadarModalOpen, 140);
 
   const [ipAddress, setIpAddress] = useState("192.168.1.88");
   const [port, setPort] = useState("8443");
@@ -43,9 +43,14 @@ export const ConnectionRadarModal: React.FC = () => {
   const [selectedFingerprint, setSelectedFingerprint] = useState<string | undefined>(undefined);
   const [probingHealth, setProbingHealth] = useState(false);
 
+  // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado,
+  // evitando bloquear el hilo de renderizado durante los frames de apertura.
   useEffect(() => {
     if (isRadarModalOpen) {
-      scanNetwork();
+      const timer = setTimeout(() => {
+        scanNetwork();
+      }, 180);
+      return () => clearTimeout(timer);
     }
   }, [isRadarModalOpen, scanNetwork]);
 
@@ -89,7 +94,7 @@ export const ConnectionRadarModal: React.FC = () => {
   return (
     <div
       onClick={() => setRadarModalOpen(false)}
-      className={`fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 ${
+      className={`fixed inset-0 z-50 bg-[#05050A]/88 flex items-center justify-center p-4 ${
         isClosing ? "animate-cyber-backdrop-out" : "animate-cyber-backdrop-in"
       }`}
     >
@@ -103,7 +108,7 @@ export const ConnectionRadarModal: React.FC = () => {
           title="RADAR DE CONEXIÓN // ANDROID WEB SERVICE"
           subtitle="Descubrimiento LAN (/api/v1/health) + Emparejamiento HTTPS TLS 1.3 TOFU (/api/v1/auth/pair)"
           accentColor="crimson"
-          className="w-full shadow-crimson-glow"
+          className="w-full"
           headerRight={
             <CyberButton
               variant="ghost"
@@ -137,9 +142,9 @@ export const ConnectionRadarModal: React.FC = () => {
                 </CyberButton>
               </div>
 
-              <div className="space-y-2.5 max-h-52 overflow-y-auto scroll-smooth pr-1">
+              <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1">
                 {discoveredDevices.length === 0 ? (
-                  <div className="p-5 bg-akatsuki-mantle cyber-chamfer-sm cyber-border-subtle text-center space-y-1.5 animate-cyber-row">
+                  <div className="p-5 bg-akatsuki-mantle cyber-chamfer-sm cyber-border-subtle text-center space-y-1.5">
                     <MonoHash className="block text-akatsuki-heading">
                       {status === "scanning"
                         ? "ESCANEANDO SUBRED LOCAL EN PUERTO 8443..."
@@ -151,19 +156,18 @@ export const ConnectionRadarModal: React.FC = () => {
                     </BodyText>
                   </div>
                 ) : (
-                  discoveredDevices.map((dev, idx) => {
+                  discoveredDevices.map((dev) => {
                     const isSelected =
                       ipAddress === dev.ipAddress && String(dev.port) === port;
                     return (
                       <div
                         key={dev.deviceId}
-                        style={{ animationDelay: `${Math.min(idx * 45, 220)}ms` }}
                         onClick={() => {
                           setIpAddress(dev.ipAddress);
                           setPort(String(dev.port));
                           setSelectedFingerprint(dev.tlsCertFingerprintSha256);
                         }}
-                        className={`animate-cyber-row p-3 bg-akatsuki-mantle cursor-pointer transition-all duration-200 hover:translate-x-1 cyber-chamfer-sm hover-cyber-border-crimson flex flex-col gap-1.5 ${
+                        className={`p-3 bg-akatsuki-mantle cursor-pointer transition-[transform,background-color] duration-150 hover:translate-x-1 cyber-chamfer-sm hover-cyber-border-crimson flex flex-col gap-1.5 ${
                           isSelected ? "cyber-border-crimson" : "cyber-border-subtle"
                         }`}
                       >
