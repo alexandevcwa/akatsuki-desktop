@@ -13,6 +13,8 @@ import {
   CyberPanel,
   CyberBadge,
   CyberButton,
+  ListItemText,
+  ListMetaText,
   MonoHash,
 } from "@/design-system";
 import { useTransferStore } from "../store/useTransferStore";
@@ -23,7 +25,7 @@ function renderStatusLabel(task: TransferTask): React.ReactNode {
   switch (task.status) {
     case "completed":
       return (
-        <span className="inline-flex items-center gap-1 text-emerald-400 font-mono text-[11px] font-semibold">
+        <span className="inline-flex items-center gap-1 text-akatsuki-success font-mono text-list-meta font-semibold">
           <CheckCircle2 className="w-3 h-3 shrink-0" />
           COMPLETADO
         </span>
@@ -32,7 +34,7 @@ function renderStatusLabel(task: TransferTask): React.ReactNode {
       return (
         <span
           title={task.errorMessage || "Error en la transferencia"}
-          className="inline-flex items-center gap-1 text-akatsuki-danger font-mono text-[11px] font-semibold"
+          className="inline-flex items-center gap-1 text-akatsuki-danger font-mono text-list-meta font-semibold"
         >
           <AlertCircle className="w-3 h-3 shrink-0" />
           ERROR
@@ -40,23 +42,23 @@ function renderStatusLabel(task: TransferTask): React.ReactNode {
       );
     case "hashing_local":
       return (
-        <span className="inline-flex items-center gap-1 text-purple-300 font-mono text-[11px]">
+        <span className="inline-flex items-center gap-1 text-akatsuki-purple font-mono text-list-meta">
           <Loader2 className="w-3 h-3 animate-spin shrink-0" />
           HASH SHA-256
         </span>
       );
     case "verifying_sha256":
       return (
-        <span className="inline-flex items-center gap-1 text-akatsuki-cyan font-mono text-[11px]">
+        <span className="inline-flex items-center gap-1 text-akatsuki-cyan font-mono text-list-meta">
           <Loader2 className="w-3 h-3 animate-spin shrink-0" />
           VERIFICANDO
         </span>
       );
     default:
       return (
-        <span className="font-mono text-[11px] text-akatsuki-telemetry tabular-nums">
+        <ListMetaText className="text-akatsuki-telemetry">
           {formatSpeed(task.speedBytesPerSec)}
-        </span>
+        </ListMetaText>
       );
   }
 }
@@ -87,7 +89,7 @@ export const TransferQueueDrawer: React.FC = () => {
           {completedCount > 0 && (
             <CyberButton
               variant="ghost"
-              size="sm"
+              size="xs"
               onClick={clearCompleted}
               leftIcon={<Trash2 className="w-3 h-3" />}
             >
@@ -97,8 +99,8 @@ export const TransferQueueDrawer: React.FC = () => {
         </div>
       }
     >
-      {/* Cabecera Compacta de Columnas (1 sola línea alineada) */}
-      <div className="px-3.5 py-1 bg-akatsuki-mantle/90 border-b border-white/10 flex items-center gap-3 font-display text-[10px] font-bold uppercase tracking-wider text-akatsuki-muted shrink-0 whitespace-nowrap">
+      {/* Cabecera Compacta de Columnas usando token oficial `text-list-header` */}
+      <div className="px-3 py-1 bg-akatsuki-mantle/90 border-b border-white/10 flex items-center gap-3 font-display text-list-header uppercase text-akatsuki-muted shrink-0 whitespace-nowrap">
         <span className="w-24 shrink-0">Dirección</span>
         <span className="flex-1 min-w-0">Archivo</span>
         <span className="w-36 shrink-0">Progreso</span>
@@ -110,11 +112,11 @@ export const TransferQueueDrawer: React.FC = () => {
       {/* Lista de Logs de Transferencia (1 fila compacta por operación) */}
       <div className="cyber-scroll-container flex-1 overflow-y-auto divide-y divide-white/5">
         {tasks.length === 0 ? (
-          <div className="h-full flex items-center justify-between px-3.5 text-akatsuki-muted">
-            <MonoHash className="text-[11px]">
+          <div className="h-full flex items-center justify-between px-3 text-akatsuki-muted">
+            <MonoHash>
               SIN OPERACIONES RECIENTES // SELECCIONA "ENVIAR" O "RECIBIR" EN CUALQUIER ARCHIVO
             </MonoHash>
-            <MonoHash className="hidden sm:inline text-[11px] text-akatsuki-telemetry/80">
+            <MonoHash className="hidden sm:inline text-akatsuki-telemetry/80">
               CANAL CIFRADO TLS 1.3 • VERIFICACIÓN SHA-256 ACTIVA
             </MonoHash>
           </div>
@@ -130,12 +132,12 @@ export const TransferQueueDrawer: React.FC = () => {
               <div
                 key={task.id}
                 title={`${task.sourcePath} → ${task.destinationPath}`}
-                className="cyber-file-row animate-cyber-slide-down h-7 px-3.5 flex items-center gap-3 hover:bg-akatsuki-elevated/60 transition-colors whitespace-nowrap"
+                className="cyber-file-row animate-cyber-slide-down h-7 px-3 flex items-center gap-3 hover:bg-akatsuki-elevated/60 transition-colors whitespace-nowrap"
               >
-                {/* 1. Dirección Compacta */}
+                {/* 1. Dirección Compacta (`text-telemetry-xs`) */}
                 <div className="w-24 shrink-0 flex items-center">
                   <span
-                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-mono font-semibold uppercase border ${
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 font-mono text-telemetry-xs uppercase border ${
                       isUpload
                         ? "bg-akatsuki-primary-muted/80 text-akatsuki-accent border-akatsuki-primary/50"
                         : "bg-akatsuki-cyan/10 text-akatsuki-telemetry border-akatsuki-cyan/40"
@@ -155,19 +157,19 @@ export const TransferQueueDrawer: React.FC = () => {
                   </span>
                 </div>
 
-                {/* 2. Nombre del Archivo (Truncado en 1 línea sin desbordar) */}
+                {/* 2. Nombre del Archivo (`ListItemText`) */}
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <span className="font-sans text-[12px] font-medium text-akatsuki-heading truncate">
+                  <ListItemText className="text-akatsuki-heading truncate">
                     {task.fileName}
-                  </span>
+                  </ListItemText>
                   {task.status === "failed" && task.errorMessage && (
-                    <span className="text-[10px] font-mono text-akatsuki-accent truncate">
+                    <MonoHash className="text-akatsuki-accent truncate">
                       ({task.errorMessage})
-                    </span>
+                    </MonoHash>
                   )}
                 </div>
 
-                {/* 3. Barra de Progreso + Porcentaje en la misma línea */}
+                {/* 3. Barra de Progreso + Porcentaje (`ListMetaText`) */}
                 <div className="w-36 shrink-0 flex items-center gap-2">
                   <div className="flex-1 h-1.5 bg-akatsuki-mantle border border-white/10 overflow-hidden">
                     <div
@@ -183,31 +185,31 @@ export const TransferQueueDrawer: React.FC = () => {
                       style={{ width: `${percent}%` }}
                     />
                   </div>
-                  <span className="w-8 text-right font-mono text-[11px] text-akatsuki-heading tabular-nums">
+                  <ListMetaText className="w-8 text-right text-akatsuki-heading">
                     {percent}%
-                  </span>
+                  </ListMetaText>
                 </div>
 
-                {/* 4. Volumen Transferido / Total */}
-                <div className="hidden md:block w-32 shrink-0 text-right font-mono text-[11px] text-akatsuki-body tabular-nums">
+                {/* 4. Volumen Transferido / Total (`ListMetaText`) */}
+                <ListMetaText className="hidden md:block w-32 shrink-0 text-right text-akatsuki-body">
                   {formatBytes(task.transferredBytes, 1)} / {formatBytes(task.totalBytes, 1)}
-                </div>
+                </ListMetaText>
 
                 {/* 5. Estado / Velocidad */}
                 <div className="w-28 shrink-0 text-right flex items-center justify-end">
                   {renderStatusLabel(task)}
                 </div>
 
-                {/* 6. Hash SHA-256 Compacto */}
+                {/* 6. Hash SHA-256 Compacto (`MonoHash`) */}
                 <div className="hidden xl:flex w-36 shrink-0 items-center justify-end gap-1 text-right">
                   <ShieldCheck
                     className={`w-3 h-3 shrink-0 ${
                       task.sha256Checksum ? "text-akatsuki-purple" : "text-akatsuki-muted/50"
                     }`}
                   />
-                  <span className="font-mono text-[10px] text-akatsuki-muted truncate tabular-nums">
+                  <MonoHash className="truncate tabular-nums">
                     {formatShortSha256(task.sha256Checksum)}
-                  </span>
+                  </MonoHash>
                 </div>
               </div>
             );

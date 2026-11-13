@@ -1,6 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "../utils/cn";
 
 export type CyberBadgeTone = "crimson" | "cyan" | "purple" | "success" | "warning" | "muted";
 
@@ -42,16 +41,14 @@ export const CyberBadge: React.FC<CyberBadgeProps> = ({
 
   return (
     <span
-      className={twMerge(
-        clsx(
-          "inline-flex items-center gap-1.5 px-2.5 py-0.5 border font-mono text-mono-hash uppercase tracking-wider",
-          toneClasses[tone],
-          className
-        )
+      className={cn(
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 border font-mono text-mono-hash uppercase tracking-wider",
+        toneClasses[tone],
+        className
       )}
     >
       {pulse && (
-        <span className={clsx("w-1.5 h-1.5 rounded-full animate-pulse", dotClasses[tone])} />
+        <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", dotClasses[tone])} />
       )}
       {icon && <span className="shrink-0">{icon}</span>}
       <span>{children}</span>

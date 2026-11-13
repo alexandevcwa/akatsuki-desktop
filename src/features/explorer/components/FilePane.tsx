@@ -221,13 +221,15 @@ export const FilePane: React.FC<FilePaneProps> = ({
           )}
         </div>
 
-        {/* Cabecera de Tabla (List Header) */}
-        <div className="px-3.5 py-1.5 bg-akatsuki-mantle border-b border-white/10 flex items-center justify-between font-display text-list-header uppercase text-akatsuki-muted shrink-0">
-          <span>Nombre del Recurso ({filteredEntries.length})</span>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-block w-28 text-right">Modificado</span>
+        {/* Cabecera de Tabla Compacta (List Header - 1 línea alineada con FileRow) */}
+        <div className="px-3 py-1.5 bg-akatsuki-mantle border-b border-white/10 flex items-center justify-between gap-3 font-display text-list-header uppercase text-akatsuki-muted shrink-0 whitespace-nowrap">
+          <span className="flex-1 min-w-0 truncate">
+            Nombre del Recurso ({filteredEntries.length})
+          </span>
+          <div className="flex items-center gap-3.5 shrink-0">
+            <span className="hidden sm:block w-32 text-right">Modificado</span>
             <span className="w-20 text-right">Tamaño</span>
-            <span className="w-32 text-right">Acciones</span>
+            <span className="w-28 text-right">Acciones</span>
           </div>
         </div>
 

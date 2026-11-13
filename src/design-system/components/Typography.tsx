@@ -1,10 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from "../utils/cn";
 
 interface TypographyProps extends React.HTMLAttributes<HTMLElement> {
   children: React.ReactNode;
@@ -38,7 +33,7 @@ export const Heading1: React.FC<TypographyProps> = ({ children, className, ...pr
 );
 
 /**
- * Heading2 (1.125rem / 18px - Orbitron/Rajdhani SemiBold Uppercase)
+ * Heading2 (1.0rem / 16px - Orbitron/Rajdhani SemiBold Uppercase)
  * Uso: Encabezado de Panel (PC / Android) o Modal
  */
 export const Heading2: React.FC<TypographyProps> = ({ children, className, ...props }) => (
@@ -51,7 +46,7 @@ export const Heading2: React.FC<TypographyProps> = ({ children, className, ...pr
 );
 
 /**
- * Heading3 (0.9375rem / 15px - Rajdhani SemiBold)
+ * Heading3 (0.875rem / 14px - Rajdhani SemiBold)
  * Uso: Subtítulo de Sección / Card Header
  */
 export const Heading3: React.FC<TypographyProps> = ({ children, className, ...props }) => (
@@ -64,7 +59,7 @@ export const Heading3: React.FC<TypographyProps> = ({ children, className, ...pr
 );
 
 /**
- * BodyText (0.875rem / 14px - Plus Jakarta Sans Regular/Medium)
+ * BodyText (0.8125rem / 13px - Plus Jakarta Sans Regular)
  * Uso: Texto general, descripciones y diálogos
  */
 export const BodyText: React.FC<TypographyProps> = ({ children, className, ...props }) => (
@@ -74,21 +69,46 @@ export const BodyText: React.FC<TypographyProps> = ({ children, className, ...pr
 );
 
 /**
- * ListItemText (0.8125rem / 13px - Plus Jakarta Sans Medium)
- * Uso: Nombres de archivos y carpetas en listas del explorador
+ * ListItemText (0.75rem / 12px - Plus Jakarta Sans Medium)
+ * Uso: Nombres de archivos y carpetas en listas densas del explorador (1 sola línea)
  */
 export const ListItemText: React.FC<TypographyProps> = ({ children, className, ...props }) => (
-  <span className={cn("font-sans text-list-item text-akatsuki-body", className)} {...props}>
+  <span
+    className={cn("font-sans text-list-item text-akatsuki-body whitespace-nowrap", className)}
+    {...props}
+  >
+    {children}
+  </span>
+);
+
+/**
+ * ListMetaText (0.6875rem / 11px - JetBrains Mono Medium Tabular)
+ * Uso: Columnas de Fecha/Hora y Tamaño en filas de tablas de archivos (garantiza 1 sola línea sin saltos)
+ */
+export const ListMetaText: React.FC<TypographyProps> = ({ children, className, ...props }) => (
+  <span
+    className={cn(
+      "font-mono text-list-meta text-akatsuki-muted tabular-nums whitespace-nowrap",
+      className
+    )}
+    {...props}
+  >
     {children}
   </span>
 );
 
 /**
  * MonoTelemetry (0.75rem / 12px - JetBrains Mono Medium)
- * Uso: Telemetría, IP:Puerto, velocidades MB/s, tamaños de archivo
+ * Uso: Telemetría, IP:Puerto, velocidades MB/s, tamaños destacados
  */
 export const MonoTelemetry: React.FC<TypographyProps> = ({ children, className, ...props }) => (
-  <span className={cn("font-mono text-mono-data text-akatsuki-telemetry", className)} {...props}>
+  <span
+    className={cn(
+      "font-mono text-mono-data text-akatsuki-telemetry tabular-nums whitespace-nowrap",
+      className
+    )}
+    {...props}
+  >
     {children}
   </span>
 );
@@ -98,7 +118,10 @@ export const MonoTelemetry: React.FC<TypographyProps> = ({ children, className, 
  * Uso: Huellas SHA-256, certificados TLS, rutas técnicas
  */
 export const MonoHash: React.FC<TypographyProps> = ({ children, className, ...props }) => (
-  <code className={cn("font-mono text-mono-hash text-akatsuki-muted", className)} {...props}>
+  <code
+    className={cn("font-mono text-mono-hash text-akatsuki-muted whitespace-nowrap", className)}
+    {...props}
+  >
     {children}
   </code>
 );

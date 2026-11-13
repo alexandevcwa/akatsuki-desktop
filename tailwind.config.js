@@ -40,40 +40,52 @@ export default {
           { lineHeight: "1.25", letterSpacing: "0.06em", fontWeight: "700" },
         ],
         "heading-2": [
-          "1.125rem",
-          { lineHeight: "1.30", letterSpacing: "0.05em", fontWeight: "600" },
+          "1.0rem",
+          { lineHeight: "1.25", letterSpacing: "0.05em", fontWeight: "600" },
         ],
         "heading-3": [
-          "0.9375rem",
-          { lineHeight: "1.40", letterSpacing: "0.04em", fontWeight: "600" },
+          "0.875rem",
+          { lineHeight: "1.35", letterSpacing: "0.04em", fontWeight: "600" },
         ],
         "body-md": [
-          "0.875rem",
-          { lineHeight: "1.50", letterSpacing: "0em", fontWeight: "400" },
+          "0.8125rem",
+          { lineHeight: "1.45", letterSpacing: "0em", fontWeight: "400" },
         ],
         "list-item": [
-          "0.8125rem",
-          { lineHeight: "1.40", letterSpacing: "0.01em", fontWeight: "500" },
+          "0.75rem",
+          { lineHeight: "1.25", letterSpacing: "0.01em", fontWeight: "500" },
+        ],
+        "list-meta": [
+          "0.6875rem",
+          { lineHeight: "1.00", letterSpacing: "0em", fontWeight: "500" },
         ],
         "list-header": [
-          "0.75rem",
-          { lineHeight: "1.20", letterSpacing: "0.08em", fontWeight: "700" },
+          "0.6875rem",
+          { lineHeight: "1.15", letterSpacing: "0.08em", fontWeight: "700" },
         ],
         "button-md": [
-          "0.875rem",
+          "0.8125rem",
           { lineHeight: "1.00", letterSpacing: "0.06em", fontWeight: "700" },
         ],
         "button-sm": [
-          "0.75rem",
+          "0.6875rem",
           { lineHeight: "1.00", letterSpacing: "0.05em", fontWeight: "600" },
+        ],
+        "button-xs": [
+          "0.625rem",
+          { lineHeight: "1.00", letterSpacing: "0.04em", fontWeight: "600" },
         ],
         "mono-data": [
           "0.75rem",
-          { lineHeight: "1.40", letterSpacing: "-0.01em", fontWeight: "500" },
+          { lineHeight: "1.30", letterSpacing: "-0.01em", fontWeight: "500" },
         ],
         "mono-hash": [
           "0.6875rem",
-          { lineHeight: "1.35", letterSpacing: "0em", fontWeight: "400" },
+          { lineHeight: "1.25", letterSpacing: "0em", fontWeight: "400" },
+        ],
+        "telemetry-xs": [
+          "0.625rem",
+          { lineHeight: "1.15", letterSpacing: "0.04em", fontWeight: "600" },
         ],
       },
       boxShadow: {

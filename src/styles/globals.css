@@ -22,6 +22,46 @@
  * SISTEMA DE BORDES BISELADOS 45° (HUD CYBERPUNK CHAMFER)
  * Dibuja un borde continuo de 6 lados incluyendo las diagonales recortadas.
  * ============================================================================ */
+.cyber-chamfer-xs {
+  position: relative;
+  border: none !important;
+  --cyber-border: rgba(255, 255, 255, 0.15);
+  clip-path: polygon(
+    0 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% 100%,
+    5px 100%,
+    0 calc(100% - 5px)
+  );
+}
+
+.cyber-chamfer-xs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+  background-color: var(--cyber-border);
+  transition: background-color 140ms ease-out;
+  clip-path: polygon(
+    0 0,
+    calc(100% - 5px) 0,
+    100% 5px,
+    100% 100%,
+    5px 100%,
+    0 calc(100% - 5px),
+    0 0,
+    1.25px 1.25px,
+    1.25px calc(100% - 5.5px),
+    5.5px calc(100% - 1.25px),
+    calc(100% - 1.25px) calc(100% - 1.25px),
+    calc(100% - 1.25px) 5.5px,
+    calc(100% - 5.5px) 1.25px,
+    1.25px 1.25px
+  );
+}
+
 .cyber-chamfer-sm {
   position: relative;
   border: none !important;
@@ -283,8 +323,57 @@
   transform: translate3d(260%, 0, 0) skewX(-24deg);
 }
 
-/* Utilidades Cyberpunk HUD adicionales */
+/* Utilidades Cyberpunk HUD y Escala Tipográfica Oficial del Sistema de Diseño */
 @layer utilities {
+  .text-list-item {
+    font-size: 0.75rem;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    font-weight: 500;
+  }
+
+  .text-list-meta {
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: 0em;
+    font-weight: 500;
+  }
+
+  .text-list-header {
+    font-size: 0.6875rem;
+    line-height: 1.15;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+  }
+
+  .text-button-md {
+    font-size: 0.8125rem;
+    line-height: 1;
+    letter-spacing: 0.06em;
+    font-weight: 700;
+  }
+
+  .text-button-sm {
+    font-size: 0.6875rem;
+    line-height: 1;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+
+  .text-button-xs {
+    font-size: 0.625rem;
+    line-height: 1;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  .text-telemetry-xs {
+    font-size: 0.625rem;
+    line-height: 1.15;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
   .cyber-grid-bg {
     background-image: 
       linear-gradient(to right, rgba(225, 29, 72, 0.04) 1px, transparent 1px),

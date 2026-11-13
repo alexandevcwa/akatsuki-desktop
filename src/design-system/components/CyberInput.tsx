@@ -1,6 +1,5 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "../utils/cn";
 
 interface CyberInputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -32,13 +31,11 @@ export const CyberInput: React.FC<CyberInputProps> = ({
           </span>
         )}
         <input
-          className={twMerge(
-            clsx(
-              "w-full bg-akatsuki-mantle border border-white/15 px-3 py-2 text-akatsuki-heading placeholder:text-akatsuki-muted/60 focus:outline-none focus:border-akatsuki-primary focus:bg-akatsuki-elevated/60 transition-colors",
-              leftIcon && "pl-9",
-              mono ? "font-mono text-mono-data text-akatsuki-telemetry" : "font-sans text-body-md",
-              className
-            )
+          className={cn(
+            "w-full bg-akatsuki-mantle border border-white/15 px-3 py-2 text-akatsuki-heading placeholder:text-akatsuki-muted/60 focus:outline-none focus:border-akatsuki-primary focus:bg-akatsuki-elevated/60 transition-colors",
+            leftIcon && "pl-9",
+            mono ? "font-mono text-mono-data text-akatsuki-telemetry" : "font-sans text-body-md",
+            className
           )}
           {...props}
         />

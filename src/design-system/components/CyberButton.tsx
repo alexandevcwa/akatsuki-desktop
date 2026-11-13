@@ -1,9 +1,8 @@
 import React from "react";
-import { clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "../utils/cn";
 
 export type CyberButtonVariant = "primary" | "secondary" | "ghost" | "danger";
-export type CyberButtonSize = "md" | "sm";
+export type CyberButtonSize = "md" | "sm" | "xs";
 
 export interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: CyberButtonVariant;
@@ -15,7 +14,7 @@ export interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonE
 
 /**
  * Botón oficial del Sistema de Diseño Akatsuki Cyberpunk optimizado para 60/144 FPS.
- * Evita `transition-all` y anima exclusivamente propiedades de composición GPU (`transform`, `background-color`, `color`).
+ * Soporta variantes `md` (formularios/header), `sm` (toolbars) y `xs` (acciones compactas en tablas).
  */
 export const CyberButton: React.FC<CyberButtonProps> = ({
   variant = "primary",
@@ -40,28 +39,33 @@ export const CyberButton: React.FC<CyberButtonProps> = ({
   };
 
   const sizeClasses: Record<CyberButtonSize, string> = {
-    md: "px-4 py-2.5 text-button-md gap-2",
-    sm: "px-3 py-1.5 text-button-sm gap-1.5",
+    md: "px-4 py-2 text-button-md gap-2",
+    sm: "px-2.5 py-1 text-button-sm gap-1.5",
+    xs: "px-2.5 py-1 text-button-xs gap-1",
   };
+
+  const chamferClass = chamfer
+    ? size === "xs"
+      ? "cyber-chamfer-xs"
+      : "cyber-chamfer-sm"
+    : "rounded-sm border";
 
   return (
     <button
       disabled={disabled}
-      className={twMerge(
-        clsx(
-          "cyber-btn-sheen inline-flex items-center justify-center font-display uppercase transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] select-none cursor-pointer",
-          chamfer ? "cyber-chamfer-sm" : "rounded-sm border",
-          variantClasses[variant],
-          sizeClasses[size],
-          disabled && "opacity-45 pointer-events-none cursor-not-allowed",
-          className
-        )
+      className={cn(
+        "cyber-btn-sheen shrink-0 inline-flex items-center justify-center font-display uppercase whitespace-nowrap transition-[transform,background-color,color] duration-150 ease-out active:scale-[0.97] select-none cursor-pointer",
+        chamferClass,
+        variantClasses[variant],
+        sizeClasses[size],
+        disabled && "opacity-45 pointer-events-none cursor-not-allowed",
+        className
       )}
       {...props}
     >
-      {leftIcon && <span className="shrink-0">{leftIcon}</span>}
+      {leftIcon && <span className="shrink-0 flex items-center">{leftIcon}</span>}
       <span>{children}</span>
-      {rightIcon && <span className="shrink-0">{rightIcon}</span>}
+      {rightIcon && <span className="shrink-0 flex items-center">{rightIcon}</span>}
     </button>
   );
 };
