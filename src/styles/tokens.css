@@ -1,0 +1,38 @@
+:root {
+  /* =========================================================================
+   * 1. FONDOS DE PANTALLA Y SUPERFICIES (BACKGROUNDS)
+   * ========================================================================= */
+  --ak-bg-void: #07070c;        /* Obsidian Cloak - Lienzo raíz de la aplicación */
+  --ak-bg-mantle: #0d0e17;      /* Shadow Mantle - Sidebar, Topbar y barras de estado */
+  --ak-bg-panel: #141624;       /* Tactical Surface - Contenedores de listas y tarjetas */
+  --ak-bg-elevated: #1d2033;    /* Uchiha Slate - Hover en filas, inputs activos */
+  --ak-bg-glass: rgba(20, 22, 36, 0.78); /* Amaterasu Glass - Modales y overlays */
+
+  /* =========================================================================
+   * 2. COLORES DE MARCA AKATSUKI & ACENTOS CYBERPUNK
+   * ========================================================================= */
+  --ak-primary: #e11d48;        /* Akatsuki Crimson - Acción principal y nubes */
+  --ak-primary-glow: #ff1e4d;   /* Sharingan Neon - Hover activo y resplandor */
+  --ak-primary-muted: #4c0519;  /* Dried Blood - Selección de filas y bordes rojos sutiles */
+  --ak-cyber-cyan: #00f0ff;     /* Rinnegan Cyber Cyan - Telemetría LAN, mDNS, velocidad */
+  --ak-cyber-purple: #a855f7;   /* Susanoo Violet - Seguridad TLS 1.3 Pinning & SHA-256 */
+  --ak-status-success: #10b981; /* Zetsu Bio-Green - Enlace activo, transferencia 100% */
+  --ak-status-warning: #f59e0b; /* Paper Bomb Amber - Verificación TOFU pendiente */
+  --ak-status-danger: #ff003c;  /* Mangekyo Scarlet - Error crítico, cancelar o eliminar */
+
+  /* =========================================================================
+   * 3. COLORES DE TIPOGRAFÍA (TEXTOS Y TÍTULOS)
+   * ========================================================================= */
+  --ak-text-heading: #f8fafc;   /* Cloud White - Títulos H1, H2, H3 */
+  --ak-text-body: #cbd5e1;      /* Shinobi Silver - Texto general y nombres de archivos */
+  --ak-text-muted: #64748b;     /* Hidden Rain Ash - Fechas, metadatos y etiquetas */
+  --ak-text-accent: #fb7185;    /* Crimson Highlight - Acentos en subtítulos y badges */
+  --ak-text-cyber: #67e8f9;     /* Neon Telemetry - IPs, tamaños, MB/s, hashes */
+
+  /* =========================================================================
+   * 4. FAMILIAS TIPOGRÁFICAS OFICIALES
+   * ========================================================================= */
+  --font-display: "Orbitron", "Rajdhani", system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
