@@ -5,10 +5,10 @@ use mdns_sd::{ServiceDaemon, ServiceEvent};
 use serde::Serialize;
 use std::collections::{BTreeMap, HashSet};
 use std::net::Ipv4Addr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
-use tokio::sync::Semaphore;
+use tokio::sync::{Mutex as AsyncMutex, Semaphore};
 use tokio::task::JoinSet;
 use tokio::time::timeout;
 
@@ -243,27 +243,84 @@ fn normalize_candidate_ports(requested_ports: Option<&[u16]>) -> Vec<u16> {
     ports
 }
 
-/// Descubre nodos Android anunciados mediante mDNS / DNS-SD (soporta cualquier puerto dinámico).
-async fn discover_via_mdns(window: Duration) -> Vec<(Ipv4Addr, u16)> {
-    let mdns = match ServiceDaemon::new() {
-        Ok(daemon) => daemon,
+static MDNS_DAEMON_STORE: OnceLock<StdMutex<Option<ServiceDaemon>>> = OnceLock::new();
+static MDNS_BROWSE_LOCK: OnceLock<AsyncMutex<()>> = OnceLock::new();
+
+/// Obtiene el daemon mDNS singleton o lo inicializa si aún no existe.
+fn get_or_init_mdns_daemon() -> Option<ServiceDaemon> {
+    let store = MDNS_DAEMON_STORE.get_or_init(|| StdMutex::new(None));
+    let mut guard = store.lock().ok()?;
+
+    if let Some(ref daemon) = *guard {
+        return Some(daemon.clone());
+    }
+
+    match ServiceDaemon::new() {
+        Ok(daemon) => {
+            eprintln!(
+                "[INFO][NetworkDiscovery] Daemon mDNS persistente inicializado ({})",
+                AKATSUKI_MDNS_SERVICE_TYPE
+            );
+            *guard = Some(daemon.clone());
+            Some(daemon)
+        }
         Err(err) => {
             eprintln!(
                 "[WARN][NetworkDiscovery] No se pudo iniciar el daemon mDNS (se usará sondeo TCP): {:?}",
                 err
             );
-            return Vec::new();
+            None
         }
+    }
+}
+
+/// Limpia la referencia del daemon mDNS almacenado si el hilo interno se cerró inesperadamente.
+fn reset_mdns_daemon() {
+    if let Some(store) = MDNS_DAEMON_STORE.get() {
+        if let Ok(mut guard) = store.lock() {
+            if let Some(daemon) = guard.take() {
+                let _ = daemon.shutdown();
+            }
+        }
+    }
+}
+
+/// Descubre nodos Android anunciados mediante mDNS / DNS-SD reutilizando un daemon persistente.
+async fn discover_via_mdns(window: Duration) -> Vec<(Ipv4Addr, u16)> {
+    let browse_lock = MDNS_BROWSE_LOCK.get_or_init(|| AsyncMutex::new(()));
+    let _browse_guard = browse_lock.lock().await;
+
+    let Some(mut mdns) = get_or_init_mdns_daemon() else {
+        return Vec::new();
     };
 
     let receiver = match mdns.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
         Ok(rx) => rx,
+        Err(mdns_sd::Error::DaemonShutdown) => {
+            eprintln!(
+                "[WARN][NetworkDiscovery] Daemon mDNS se detuvo; reiniciando instancia persistente"
+            );
+            reset_mdns_daemon();
+            let Some(fresh) = get_or_init_mdns_daemon() else {
+                return Vec::new();
+            };
+            mdns = fresh;
+            match mdns.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
+                Ok(rx) => rx,
+                Err(err) => {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] Fallo al re-suscribir a mDNS {}: {:?}",
+                        AKATSUKI_MDNS_SERVICE_TYPE, err
+                    );
+                    return Vec::new();
+                }
+            }
+        }
         Err(err) => {
             eprintln!(
                 "[WARN][NetworkDiscovery] No se pudo suscribir a mDNS {}: {:?}",
                 AKATSUKI_MDNS_SERVICE_TYPE, err
             );
-            let _ = mdns.shutdown();
             return Vec::new();
         }
     };
@@ -295,8 +352,8 @@ async fn discover_via_mdns(window: Duration) -> Vec<(Ipv4Addr, u16)> {
         }
     }
 
+    // Detenemos la suscripción activa, pero mantenemos el daemon y su caché vivos para rondas futuras.
     let _ = mdns.stop_browse(AKATSUKI_MDNS_SERVICE_TYPE);
-    let _ = mdns.shutdown();
 
     discovered.into_iter().collect()
 }
