@@ -122,16 +122,66 @@ pub async fn fetch_android_storage(
     bearer_token: &str,
 ) -> AkatsukiResult<StorageInfoResponse> {
     let endpoint = format!("https://{}:{}/api/v1/device/storage", ip_address, port);
-    let client = build_android_https_client(8)?;
+    eprintln!("[INFO][RemoteClient] Iniciando consulta de almacenamiento en {}", endpoint);
 
-    let resp = client
-        .get(&endpoint)
-        .bearer_auth(bearer_token)
-        .send()
-        .await?;
+    let client = match build_android_https_client(8) {
+        Ok(c) => c,
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Error al instanciar cliente HTTPS para {}: {:?}",
+                endpoint, err
+            );
+            return Err(err);
+        }
+    };
 
-    let resp = ensure_success_status(resp).await?;
-    Ok(resp.json::<StorageInfoResponse>().await?)
+    let resp = match client.get(&endpoint).bearer_auth(bearer_token).send().await {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Fallo de conectividad/red hacia {}: {:?}",
+                endpoint, err
+            );
+            return Err(err.into());
+        }
+    };
+
+    let status = resp.status();
+    let resp = match ensure_success_status(resp).await {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!(
+                "[WARN][RemoteClient] El dispositivo respondió con estado HTTP {} ({}) en {}",
+                status.as_u16(),
+                status.canonical_reason().unwrap_or("Unknown"),
+                endpoint
+            );
+            return Err(err);
+        }
+    };
+
+    match resp.json::<StorageInfoResponse>().await {
+        Ok(storage_info) => {
+            let total_gb = storage_info.android_storage_total_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            let free_gb = storage_info.android_storage_free_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+            eprintln!(
+                "[INFO][RemoteClient] Almacenamiento obtenido exitosamente de {}: Total = {:.2} GB ({} bytes), Libre = {:.2} GB ({} bytes)",
+                endpoint,
+                total_gb,
+                storage_info.android_storage_total_bytes,
+                free_gb,
+                storage_info.android_storage_free_bytes
+            );
+            Ok(storage_info)
+        }
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Fallo al deserializar JSON de respuesta de {}: {:?}",
+                endpoint, err
+            );
+            Err(err.into())
+        }
+    }
 }
 
 /// 5. `GET /api/v1/files/list` — Obtiene el listado real de archivos y carpetas del dispositivo Android.
@@ -142,23 +192,82 @@ pub async fn fetch_android_directory(
     path: &str,
 ) -> AkatsukiResult<DirectoryListing> {
     let endpoint = format!("https://{}:{}/api/v1/files/list", ip_address, port);
-    let client = build_android_https_client(12)?;
-
     let clean_path = if path.trim().is_empty() {
-        "/storage/emulated/0"
+        ""
     } else {
         path.trim()
     };
 
-    let resp = client
+    eprintln!(
+        "[INFO][RemoteClient] Solicitando listado de directorio en {}: path=\"{}\"",
+        endpoint, clean_path
+    );
+
+    let client = match build_android_https_client(12) {
+        Ok(c) => c,
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Error al instanciar cliente HTTPS para listado en {}: {:?}",
+                endpoint, err
+            );
+            return Err(err);
+        }
+    };
+
+    let resp = match client
         .get(&endpoint)
         .bearer_auth(bearer_token)
         .query(&[("path", clean_path)])
         .send()
-        .await?;
+        .await
+    {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Fallo de conectividad al listar directorio en {} (path: \"{}\"): {:?}",
+                endpoint, clean_path, err
+            );
+            return Err(err.into());
+        }
+    };
 
-    let resp = ensure_success_status(resp).await?;
-    Ok(resp.json::<DirectoryListing>().await?)
+    let status = resp.status();
+    let resp = match ensure_success_status(resp).await {
+        Ok(r) => r,
+        Err(err) => {
+            eprintln!(
+                "[WARN][RemoteClient] El dispositivo respondió con estado HTTP {} ({}) al listar path \"{}\" en {}",
+                status.as_u16(),
+                status.canonical_reason().unwrap_or("Unknown"),
+                clean_path,
+                endpoint
+            );
+            return Err(err);
+        }
+    };
+
+    match resp.json::<DirectoryListing>().await {
+        Ok(listing) => {
+            let dirs_count = listing.entries.iter().filter(|e| e.is_dir).count();
+            let files_count = listing.entries.len() - dirs_count;
+            eprintln!(
+                "[INFO][RemoteClient] Listado recibido con éxito de {} (current_path=\"{}\"): {} elementos ({} carpetas, {} archivos)",
+                endpoint,
+                listing.current_path,
+                listing.entries.len(),
+                dirs_count,
+                files_count
+            );
+            Ok(listing)
+        }
+        Err(err) => {
+            eprintln!(
+                "[ERROR][RemoteClient] Fallo al deserializar DirectoryListing de {} (path: \"{}\"): {:?}",
+                endpoint, clean_path, err
+            );
+            Err(err.into())
+        }
+    }
 }
 
 /// 6. `POST /api/v1/files/mkdir` — Crea una nueva carpeta en el almacenamiento del dispositivo Android.

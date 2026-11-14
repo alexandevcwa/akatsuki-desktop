@@ -7,8 +7,6 @@ import {
 import { ActiveSession, FileEntry } from "@/shared/types/protocol";
 import { joinPath, navigateUpPath } from "@/shared/utils/path";
 
-const DEFAULT_ANDROID_ROOT = "/storage/emulated/0";
-
 interface UseAndroidExplorerOptions {
   activeSession: ActiveSession | null;
   onStorageMutation?: () => Promise<void>;
@@ -21,7 +19,7 @@ export function useAndroidExplorer({
   activeSession,
   onStorageMutation,
 }: UseAndroidExplorerOptions) {
-  const [currentPath, setCurrentPath] = useState<string>(DEFAULT_ANDROID_ROOT);
+  const [currentPath, setCurrentPath] = useState<string>("");
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,7 +90,14 @@ export function useAndroidExplorer({
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [ipAddress, port, bearerToken, currentPath, fetchDirectory, onStorageMutation],
+    [
+      ipAddress,
+      port,
+      bearerToken,
+      currentPath,
+      fetchDirectory,
+      onStorageMutation,
+    ],
   );
 
   const deleteEntry = useCallback(
@@ -111,7 +116,14 @@ export function useAndroidExplorer({
         setError(err instanceof Error ? err.message : String(err));
       }
     },
-    [ipAddress, port, bearerToken, currentPath, fetchDirectory, onStorageMutation],
+    [
+      ipAddress,
+      port,
+      bearerToken,
+      currentPath,
+      fetchDirectory,
+      onStorageMutation,
+    ],
   );
 
   return {
