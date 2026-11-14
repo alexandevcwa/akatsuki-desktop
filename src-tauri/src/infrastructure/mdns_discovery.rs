@@ -27,8 +27,8 @@ const MAX_TCP_HOSTS_PER_SUBNET: u32 = 1024;
 /// Tiempo de espera por sonda TCP individual en red local.
 const TCP_PROBE_TIMEOUT: Duration = Duration::from_millis(350);
 
-/// Ventana de escucha mDNS por ciclo de descubrimiento.
-const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(1200);
+/// Ventana de escucha mDNS por ciclo de descubrimiento (tolerante a latencia PTR -> SRV -> A en Wi-Fi/Android).
+const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(1800);
 
 /// Prefijos de interfaces virtuales o de contenedores que deben excluirse si hay LAN física.
 const IGNORED_VIRTUAL_IFACE_PREFIXES: &[&str] = &[
@@ -330,31 +330,76 @@ async fn discover_via_mdns(window: Duration) -> Vec<(Ipv4Addr, u16)> {
 
     while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
         match timeout(remaining, receiver.recv_async()).await {
+            Ok(Ok(ServiceEvent::SearchStarted(msg))) => {
+                eprintln!("[INFO][NetworkDiscovery] mDNS SearchStarted: {}", msg);
+            }
+            Ok(Ok(ServiceEvent::ServiceFound(ty, fullname))) => {
+                eprintln!(
+                    "[INFO][NetworkDiscovery] mDNS ServiceFound: {} ({}) — esperando resolución SRV/A...",
+                    fullname, ty
+                );
+            }
             Ok(Ok(ServiceEvent::ServiceResolved(info))) => {
                 let port = info.get_port();
                 if port == 0 {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] mDNS ServiceResolved con puerto 0 ignorado ({})",
+                        info.get_fullname()
+                    );
                     continue;
                 }
-                for ipv4 in info.get_addresses_v4() {
+
+                let v4_addrs = info.get_addresses_v4();
+                if v4_addrs.is_empty() {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] Servicio mDNS {} (puerto {}) resuelto sin direcciones IPv4; direcciones recibidas: {:?}",
+                        info.get_fullname(),
+                        port,
+                        info.get_addresses()
+                    );
+                    continue;
+                }
+
+                let txt_id = info.get_property_val_str("id").unwrap_or("-");
+                let txt_fp = info.get_property_val_str("fp").unwrap_or("-");
+                for ipv4 in v4_addrs {
                     if is_scannable_ipv4(ipv4) {
                         eprintln!(
-                            "[INFO][NetworkDiscovery] Servicio mDNS resuelto ({}): {}:{}",
+                            "[INFO][NetworkDiscovery] Servicio mDNS resuelto ({}): {}:{} (id={}, fp={})",
                             info.get_fullname(),
                             ipv4,
-                            port
+                            port,
+                            txt_id,
+                            txt_fp
                         );
                         discovered.insert((ipv4, port));
+                    } else {
+                        eprintln!(
+                            "[WARN][NetworkDiscovery] IP mDNS descartada por no ser escaneable: {}:{} ({})",
+                            ipv4,
+                            port,
+                            info.get_fullname()
+                        );
                     }
                 }
             }
+            Ok(Ok(ServiceEvent::ServiceRemoved(ty, fullname))) => {
+                eprintln!(
+                    "[INFO][NetworkDiscovery] mDNS ServiceRemoved: {} ({})",
+                    fullname, ty
+                );
+            }
             Ok(Ok(_)) => {}
-            Ok(Err(_)) | Err(_) => break,
+            Ok(Err(err)) => {
+                eprintln!("[WARN][NetworkDiscovery] Canal mDNS cerrado: {:?}", err);
+                break;
+            }
+            Err(_) => break,
         }
     }
 
-    // Detenemos la suscripción activa, pero mantenemos el daemon y su caché vivos para rondas futuras.
-    let _ = mdns.stop_browse(AKATSUKI_MDNS_SERVICE_TYPE);
-
+    // Mantenemos el daemon y la caché mDNS vivos entre rondas (no llamamos stop_browse
+    // porque en mdns-sd borra el cache y corta resoluciones PTR->SRV->A pendientes).
     discovered.into_iter().collect()
 }
 
@@ -424,7 +469,13 @@ async fn verify_discovered_endpoints(
                     );
                     None
                 }
-                Err(_) => None,
+                Err(err) => {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] Fallo verificando GET /api/v1/health en {}:{} (vía {}): {:?}",
+                        ip_str, port, via, err
+                    );
+                    None
+                }
             }
         });
     }
