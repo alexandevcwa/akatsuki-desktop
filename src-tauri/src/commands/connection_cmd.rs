@@ -7,11 +7,18 @@ use crate::infrastructure::android_client::{
     check_android_health, fetch_android_storage, pair_with_android_webservice,
     revoke_android_session,
 };
-use crate::infrastructure::mdns_discovery::discover_android_nodes_on_lan;
+use crate::infrastructure::mdns_discovery::{
+    discover_android_nodes_on_lan, list_local_network_subnets, LocalSubnetInfo,
+};
 
 #[tauri::command]
-pub async fn scan_lan_devices() -> AkatsukiResult<Vec<AndroidDeviceNode>> {
-    Ok(discover_android_nodes_on_lan().await)
+pub async fn scan_lan_devices(ports: Option<Vec<u16>>) -> AkatsukiResult<Vec<AndroidDeviceNode>> {
+    Ok(discover_android_nodes_on_lan(ports).await)
+}
+
+#[tauri::command]
+pub async fn get_local_network_subnets() -> AkatsukiResult<Vec<LocalSubnetInfo>> {
+    Ok(list_local_network_subnets())
 }
 
 #[tauri::command]

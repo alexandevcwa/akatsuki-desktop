@@ -5,8 +5,8 @@ pub mod infrastructure;
 
 use commands::{
     connection_cmd::{
-        check_android_node_health, get_android_device_storage, pair_android_device,
-        revoke_android_device_session, scan_lan_devices,
+        check_android_node_health, get_android_device_storage, get_local_network_subnets,
+        pair_android_device, revoke_android_device_session, scan_lan_devices,
     },
     explorer_cmd::{
         create_android_dir, create_local_dir, delete_android_file_entry, delete_local_entry,
@@ -113,6 +113,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             scan_lan_devices,
+            get_local_network_subnets,
             check_android_node_health,
             pair_android_device,
             revoke_android_device_session,

@@ -26,13 +26,15 @@ function mergeDiscoveredNodes(
 ): AndroidDeviceNode[] {
   const map = new Map<string, AndroidDeviceNode>();
   for (const item of existing) {
-    map.set(item.ipAddress, item);
+    const key = item.deviceId || `${item.ipAddress}:${item.port}`;
+    map.set(key, item);
   }
   for (const item of incoming) {
-    map.set(item.ipAddress, item);
+    const key = item.deviceId || `${item.ipAddress}:${item.port}`;
+    map.set(key, item);
   }
   return Array.from(map.values()).sort((a, b) =>
-    a.ipAddress.localeCompare(b.ipAddress)
+    a.ipAddress.localeCompare(b.ipAddress) || a.port - b.port
   );
 }
 
@@ -45,7 +47,7 @@ interface ConnectionStore {
   isRadarModalOpen: boolean;
 
   setRadarModalOpen: (open: boolean) => void;
-  scanNetwork: () => Promise<void>;
+  scanNetwork: (candidatePorts?: number[]) => Promise<void>;
   probeNodeHealth: (ipAddress: string, port: number) => Promise<AndroidDeviceNode | null>;
   connectToDevice: (
     ipAddress: string,
@@ -80,7 +82,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     set({ isRadarModalOpen: true, errorMessage: null });
   },
 
-  scanNetwork: async () => {
+  scanNetwork: async (candidatePorts) => {
     // Evitar múltiples conteos solapados si ya está buscando activamente
     if (get().status === "scanning" && get().scanRemainingSeconds > 0) {
       return;
@@ -124,7 +126,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     try {
       while (Date.now() < endTime && currentToken === activeScanToken) {
         try {
-          const devices = await scanLanAndroidDevices();
+          const devices = await scanLanAndroidDevices(candidatePorts);
           if (currentToken !== activeScanToken) break;
 
           if (devices.length > 0) {
@@ -146,7 +148,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
           break;
         }
         await new Promise((resolve) =>
-          setTimeout(resolve, Math.min(400, timeLeft))
+          setTimeout(resolve, Math.min(800, timeLeft))
         );
       }
     } finally {
@@ -180,10 +182,19 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
         paired: false,
       };
       set((state) => {
-        const exists = state.discoveredDevices.some((d) => d.ipAddress === ipAddress);
+        const exists = state.discoveredDevices.some(
+          (d) =>
+            d.deviceId === node.deviceId ||
+            (d.ipAddress === ipAddress && d.port === node.port)
+        );
         return {
           discoveredDevices: exists
-            ? state.discoveredDevices.map((d) => (d.ipAddress === ipAddress ? node : d))
+            ? state.discoveredDevices.map((d) =>
+                d.deviceId === node.deviceId ||
+                (d.ipAddress === ipAddress && d.port === node.port)
+                  ? node
+                  : d
+              )
             : [node, ...state.discoveredDevices],
         };
       });

@@ -16,6 +16,14 @@ export interface AndroidDeviceNode {
   paired: boolean;
 }
 
+export interface LocalSubnetInfo {
+  interfaceName: string;
+  localIp: string;
+  netmask: string;
+  prefixLen: number;
+  cidr: string;
+}
+
 export interface ActiveSession {
   device: AndroidDeviceNode;
   bearerToken: string;

@@ -22,6 +22,7 @@ import {
   MonoHash,
 } from "@/design-system";
 import { useAnimatedPresence } from "@/shared/utils/useAnimatedPresence";
+import { getLocalNetworkSubnets } from "../services/connectionIpc";
 import { useConnectionStore } from "../store/useConnectionStore";
 
 /**
@@ -72,7 +73,8 @@ export const ConnectionRadarModal: React.FC = () => {
     140,
   );
 
-  const [ipAddress, setIpAddress] = useState("192.168.1.88");
+  const [ipAddress, setIpAddress] = useState("");
+  const [ipPlaceholder, setIpPlaceholder] = useState("Ej. 192.168.x.x");
   const [port, setPort] = useState("8443");
   const [pinCode, setPinCode] = useState("");
   const [selectedFingerprint, setSelectedFingerprint] = useState<
@@ -80,11 +82,30 @@ export const ConnectionRadarModal: React.FC = () => {
   >(undefined);
   const [probingHealth, setProbingHealth] = useState(false);
 
+  const getCandidatePorts = (): number[] | undefined => {
+    const parsed = Number(port.trim());
+    if (Number.isInteger(parsed) && parsed > 0 && parsed <= 65535) {
+      return [parsed];
+    }
+    return undefined;
+  };
+
   // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado
   useEffect(() => {
     if (isRadarModalOpen) {
+      getLocalNetworkSubnets()
+        .then((subnets) => {
+          if (subnets.length > 0) {
+            const octets = subnets[0].localIp.split(".");
+            if (octets.length === 4) {
+              setIpPlaceholder(`Ej. ${octets[0]}.${octets[1]}.${octets[2]}.x`);
+            }
+          }
+        })
+        .catch(() => {});
+
       const timer = setTimeout(() => {
-        scanNetwork();
+        scanNetwork(getCandidatePorts());
       }, 180);
       return () => clearTimeout(timer);
     }
@@ -104,10 +125,12 @@ export const ConnectionRadarModal: React.FC = () => {
   if (!shouldRender) return null;
 
   const handleProbeHealth = async () => {
+    const cleanIp = ipAddress.trim();
+    if (!cleanIp) return;
     setProbingHealth(true);
     try {
       const node = await probeNodeHealth(
-        ipAddress.trim(),
+        cleanIp,
         Number(port) || 8443,
       );
       if (node) {
@@ -177,7 +200,7 @@ export const ConnectionRadarModal: React.FC = () => {
                 <CyberButton
                   variant="secondary"
                   size="sm"
-                  onClick={scanNetwork}
+                  onClick={() => scanNetwork(getCandidatePorts())}
                   className={`tabular-nums min-w-[146px] ${
                     status === "scanning"
                       ? "pointer-events-none bg-akatsuki-cyan/15 cyber-border-cyan"
@@ -300,6 +323,7 @@ export const ConnectionRadarModal: React.FC = () => {
                   <div className="col-span-2">
                     <CyberInput
                       label="IP Dispositivo"
+                      placeholder={ipPlaceholder}
                       value={ipAddress}
                       onChange={(e) => setIpAddress(e.target.value)}
                       mono

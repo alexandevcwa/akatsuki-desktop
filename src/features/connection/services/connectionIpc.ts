@@ -3,15 +3,27 @@ import {
   ActiveSession,
   AndroidDeviceNode,
   HealthResponse,
+  LocalSubnetInfo,
   RevokeSessionResponse,
   StorageInfoResponse,
 } from "@/shared/types/protocol";
 
 /**
- * Escanea la subred local buscando dispositivos Android activos en el puerto 8443 (`GET /api/v1/health`).
+ * Escanea las subredes locales activas de la PC mediante mDNS (puerto dinámico) y sondeo TCP (`GET /api/v1/health`).
  */
-export async function scanLanAndroidDevices(): Promise<AndroidDeviceNode[]> {
-  return invoke<AndroidDeviceNode[]>("scan_lan_devices");
+export async function scanLanAndroidDevices(
+  ports?: number[]
+): Promise<AndroidDeviceNode[]> {
+  return invoke<AndroidDeviceNode[]>("scan_lan_devices", {
+    ports: ports && ports.length > 0 ? ports : null,
+  });
+}
+
+/**
+ * Obtiene los segmentos de red IPv4 activos detectados en las interfaces de la PC.
+ */
+export async function getLocalNetworkSubnets(): Promise<LocalSubnetInfo[]> {
+  return invoke<LocalSubnetInfo[]>("get_local_network_subnets");
 }
 
 /**
