@@ -44,22 +44,33 @@ if [[ -f "$HOME/.cargo/env" ]]; then
   source "$HOME/.cargo/env"
 fi
 
-# 1. Verificar dependencias de compilación cruzada en Manjaro Linux
-echo -e "${CYAN}[1/4] Verificando herramientas de compilación cruzada a Windows...${NC}"
-
-MISSING_PKGS=()
-command -v clang >/dev/null 2>&1 || MISSING_PKGS+=("clang")
-command -v llvm-lib >/dev/null 2>&1 || MISSING_PKGS+=("llvm")
-command -v lld-link >/dev/null 2>&1 || MISSING_PKGS+=("lld")
-
-if [[ "${1:-}" != "--portable" ]]; then
-  command -v makensis >/dev/null 2>&1 || MISSING_PKGS+=("nsis")
+# Asegurar que los binarios instalados por cargo (como cargo-xwin) estén en el PATH
+if [[ -d "$HOME/.cargo/bin" ]]; then
+  export PATH="$HOME/.cargo/bin:$PATH"
 fi
 
-if [[ ${#MISSING_PKGS[@]} -gt 0 ]]; then
-  echo -e "${YELLOW}Faltan paquetes del sistema en Manjaro para compilar hacia Windows: ${MISSING_PKGS[*]}${NC}"
-  echo -e "Instálalos ejecutando:"
-  echo -e "  ${CYAN}sudo pacman -S --needed ${MISSING_PKGS[*]}${NC}"
+# Verificar dependencias de compilación cruzada en Manjaro Linux
+echo -e "${CYAN}[1/4] Verificando herramientas de compilación cruzada a Windows...${NC}"
+
+MISSING_PACMAN=()
+command -v clang >/dev/null 2>&1 || MISSING_PACMAN+=("clang")
+command -v llvm-lib >/dev/null 2>&1 || MISSING_PACMAN+=("llvm")
+command -v lld-link >/dev/null 2>&1 || MISSING_PACMAN+=("lld")
+
+MISSING_AUR=()
+if [[ "${1:-}" != "--portable" ]]; then
+  command -v makensis >/dev/null 2>&1 || MISSING_AUR+=("nsis")
+fi
+
+if [[ ${#MISSING_PACMAN[@]} -gt 0 || ${#MISSING_AUR[@]} -gt 0 ]]; then
+  echo -e "${YELLOW}Faltan herramientas en el sistema para compilar hacia Windows:${NC}"
+  if [[ ${#MISSING_PACMAN[@]} -gt 0 ]]; then
+    echo -e "  Repositorios oficiales (pacman): ${CYAN}sudo pacman -S --needed ${MISSING_PACMAN[*]}${NC}"
+  fi
+  if [[ ${#MISSING_AUR[@]} -gt 0 ]]; then
+    echo -e "  AUR (makensis para instalador NSIS): ${CYAN}yay -S ${MISSING_AUR[*]}${NC} (o: pamac build ${MISSING_AUR[*]})"
+    echo -e "  ${MUTED}(Nota: si solo quieres el ejecutable sin instalador, ejecuta con: --portable)${NC}"
+  fi
   exit 1
 fi
 
@@ -73,7 +84,7 @@ if ! command -v cargo-xwin >/dev/null 2>&1; then
   cargo install --locked cargo-xwin
 fi
 
-# 2. Ejecutar compilación cruzada con Tauri v2 + cargo-xwin
+# Ejecutar compilación cruzada con Tauri v2 + cargo-xwin
 echo -e "${CYAN}[2/4] Compilando frontend y binario Windows x64 (${TARGET_TRIPLE})...${NC}"
 
 if [[ "${1:-}" == "--portable" ]]; then
@@ -82,7 +93,7 @@ else
   npm run tauri build -- --runner cargo-xwin --target "$TARGET_TRIPLE" --bundles nsis
 fi
 
-# 3. Recolectar artefactos en dist-windows/
+# Recolectar artefactos en dist-windows/
 echo -e "${CYAN}[3/4] Recolectando ejecutable e instalador en ${DIST_WINDOWS_DIR}...${NC}"
 mkdir -p "$DIST_WINDOWS_DIR"
 
@@ -94,7 +105,7 @@ if [[ -d "$RELEASE_DIR/bundle/nsis" ]]; then
   find "$RELEASE_DIR/bundle/nsis" -maxdepth 1 -name "*.exe" -exec cp {} "$DIST_WINDOWS_DIR/" \;
 fi
 
-# 4. Generar hashes SHA-256 de verificación
+# Generar hashes SHA-256 de verificación
 echo -e "${CYAN}[4/4] Generando archivo SHA256SUMS.txt...${NC}"
 (
   cd "$DIST_WINDOWS_DIR"
