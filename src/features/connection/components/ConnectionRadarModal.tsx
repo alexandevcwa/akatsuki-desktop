@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import { QRCodeSVG } from "qrcode.react";
 import {
   Radio,
   ShieldCheck,
@@ -144,13 +143,6 @@ export const ConnectionRadarModal: React.FC = () => {
     );
   };
 
-  const qrPayload = JSON.stringify({
-    client: "akatsuki-desktop",
-    protocol: "https-tofu-v1",
-    targetEndpoint: `https://${ipAddress}:${port}`,
-    pin: pinCode,
-  });
-
   const cleanError = formatUserFriendlyError(errorMessage);
 
   return (
@@ -168,7 +160,7 @@ export const ConnectionRadarModal: React.FC = () => {
       >
         <CyberPanel
           title="RADAR DE CONEXIÓN // DISPOSITIVO ANDROID"
-          subtitle="Vinculación segura en red local mediante detección automática, código PIN o QR"
+          subtitle="Vinculación segura en red local mediante detección automática y código PIN"
           accentColor="crimson"
           className="w-full"
           headerRight={
@@ -290,7 +282,7 @@ export const ConnectionRadarModal: React.FC = () => {
               </div>
             </div>
 
-            {/* Columna Derecha: Formulario de Conexión Manual + QR */}
+            {/* Columna Derecha: Formulario de Conexión Manual */}
             <form
               onSubmit={handleConnect}
               className="md:col-span-5 flex flex-col justify-between space-y-4 bg-akatsuki-mantle p-4 border border-white/10"
@@ -340,23 +332,6 @@ export const ConnectionRadarModal: React.FC = () => {
                   onChange={setPinCode}
                   required
                 />
-
-                {/* QR para escaneo desde la app Android */}
-                <div className="pt-2 flex items-center gap-3 bg-akatsuki-panel p-2.5 border border-white/10">
-                  <div className="bg-white p-1.5 rounded-sm shrink-0">
-                    <QRCodeSVG value={qrPayload} size={68} level="M" />
-                  </div>
-                  <div className="space-y-1">
-                    <span className="font-display text-list-header uppercase text-akatsuki-heading block">
-                      Sincronización Rápida QR
-                    </span>
-                    <p className="text-[11px] text-akatsuki-muted leading-tight">
-                      Escanea este código desde la aplicación de tu celular
-                      Android o ingresa el código PIN para vincular ambos
-                      equipos.
-                    </p>
-                  </div>
-                </div>
 
                 {cleanError && (
                   <div className="animate-cyber-slide-down p-2.5 bg-akatsuki-primary-muted/90 cyber-chamfer-sm cyber-border-crimson flex items-start gap-2.5">
