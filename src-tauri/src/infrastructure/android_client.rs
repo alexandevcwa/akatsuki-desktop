@@ -18,16 +18,31 @@ use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio_util::io::ReaderStream;
 
-/// Construye el cliente HTTPS de Reqwest para conectarse al Web Service en red local (LAN).
-pub fn build_android_https_client(timeout_secs: u64) -> AkatsukiResult<Client> {
+/// Timeout total y de conexión para el sondeo rápido `GET /api/v1/health` en red local (LAN).
+const HEALTH_PROBE_TIMEOUT: Duration = Duration::from_millis(2000);
+const HEALTH_PROBE_CONNECT_TIMEOUT: Duration = Duration::from_millis(1500);
+
+/// Construye el cliente HTTPS de Reqwest con timeouts explícitos para red local (LAN).
+fn build_android_https_client_with_timeouts(
+    request_timeout: Duration,
+    connect_timeout: Duration,
+) -> AkatsukiResult<Client> {
     let client = Client::builder()
-        .timeout(Duration::from_secs(timeout_secs))
-        .connect_timeout(Duration::from_secs(4))
+        .timeout(request_timeout)
+        .connect_timeout(connect_timeout)
         // En red local (IP privada) el certificado X.509 del Android es autofirmado
         // y se verifica criptográficamente mediante Certificate Pinning SHA-256 (TOFU).
         .danger_accept_invalid_certs(true)
         .build()?;
     Ok(client)
+}
+
+/// Construye el cliente HTTPS de Reqwest para conectarse al Web Service en red local (LAN).
+pub fn build_android_https_client(timeout_secs: u64) -> AkatsukiResult<Client> {
+    build_android_https_client_with_timeouts(
+        Duration::from_secs(timeout_secs),
+        Duration::from_secs(4),
+    )
 }
 
 /// Valida que la respuesta tenga un estado exitoso; de lo contrario devuelve un mensaje claro para el usuario.
@@ -57,7 +72,10 @@ async fn ensure_success_status(resp: Response) -> AkatsukiResult<Response> {
 /// 1. `GET /api/v1/health` — Verifica estado del servidor Android y obtiene su huella TLS.
 pub async fn check_android_health(ip_address: &str, port: u16) -> AkatsukiResult<HealthResponse> {
     let endpoint = format!("https://{}:{}/api/v1/health", ip_address, port);
-    let client = build_android_https_client(5)?;
+    let client = build_android_https_client_with_timeouts(
+        HEALTH_PROBE_TIMEOUT,
+        HEALTH_PROBE_CONNECT_TIMEOUT,
+    )?;
     let resp = client.get(&endpoint).send().await?;
     let resp = ensure_success_status(resp).await?;
     Ok(resp.json::<HealthResponse>().await?)

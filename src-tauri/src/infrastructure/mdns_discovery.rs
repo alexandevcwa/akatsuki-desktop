@@ -1,11 +1,14 @@
 use crate::domain::device::AndroidDeviceNode;
 use crate::infrastructure::android_client::check_android_health;
 use if_addrs::{get_if_addrs, IfAddr};
-use mdns_sd::{ServiceDaemon, ServiceEvent};
+use mdns_sd::{
+    IfKind, IfPredicate, Receiver as MdnsReceiver, ResolvedService, ServiceDaemon, ServiceEvent,
+    TryRecvError,
+};
 use serde::Serialize;
-use std::collections::{BTreeMap, HashSet};
-use std::net::Ipv4Addr;
-use std::sync::{Arc, Mutex as StdMutex, OnceLock};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::net::{IpAddr, Ipv4Addr};
+use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::net::TcpStream;
 use tokio::sync::{Mutex as AsyncMutex, Semaphore};
@@ -28,12 +31,21 @@ const MAX_TCP_HOSTS_PER_SUBNET: u32 = 1024;
 const TCP_PROBE_TIMEOUT: Duration = Duration::from_millis(350);
 
 /// Ventana de escucha mDNS por ciclo de descubrimiento (tolerante a latencia PTR -> SRV -> A en Wi-Fi/Android).
-const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(1800);
+const MDNS_BROWSE_WINDOW: Duration = Duration::from_millis(2200);
+
+/// Intervalo mínimo tras el cual se reinicia el backoff exponencial de `browse` si no hay servicios resueltos.
+const MDNS_BROWSE_REFRESH_INTERVAL: Duration = Duration::from_secs(15);
+
+/// Tiempo de espera RFC 6762 §10.4 para verificar si una entrada mDNS en caché sigue viva tras un fallo de health.
+const MDNS_VERIFY_STALE_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Habilita el barrido TCP multi-subred en paralelo a mDNS para redes con filtrado multicast.
+const ENABLE_TCP_SUBNET_SCAN: bool = false;
 
 /// Prefijos de interfaces virtuales o de contenedores que deben excluirse si hay LAN física.
 const IGNORED_VIRTUAL_IFACE_PREFIXES: &[&str] = &[
     "docker", "veth", "br-", "virbr", "vmnet", "vboxnet", "lxc", "cni", "flannel", "podman",
-    "tailscale", "tun", "tap",
+    "tailscale", "tun", "tap", "wg",
 ];
 
 /// Información resumida de una subred local activa para exponerla al frontend.
@@ -55,6 +67,29 @@ struct LocalSubnet {
     prefix_len: u8,
     network_u32: u32,
     hosts: Vec<Ipv4Addr>,
+}
+
+/// Metadatos extraídos de los registros TXT del anuncio mDNS de Android (`fp`, `id`, `name`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct MdnsTxtMetadata {
+    device_id: Option<String>,
+    fingerprint_sha256: Option<String>,
+    device_name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct MdnsEndpointEntry {
+    ip: Ipv4Addr,
+    port: u16,
+    fullname: String,
+    meta: MdnsTxtMetadata,
+}
+
+#[derive(Debug, Clone)]
+struct CandidateEndpoint {
+    via: &'static str,
+    fullname: Option<String>,
+    mdns_meta: Option<MdnsTxtMetadata>,
 }
 
 /// Determina si una interfaz de red corresponde a un adaptador virtual/túnel secundario.
@@ -243,164 +278,308 @@ fn normalize_candidate_ports(requested_ports: Option<&[u16]>) -> Vec<u16> {
     ports
 }
 
-static MDNS_DAEMON_STORE: OnceLock<StdMutex<Option<ServiceDaemon>>> = OnceLock::new();
-static MDNS_BROWSE_LOCK: OnceLock<AsyncMutex<()>> = OnceLock::new();
+struct PersistentMdnsBrowser {
+    daemon: ServiceDaemon,
+    receiver: MdnsReceiver<ServiceEvent>,
+    /// Mapa `fullname` -> entradas IPv4 resueltas para mantener vivos los anuncios entre rondas.
+    resolved_by_fullname: HashMap<String, Vec<MdnsEndpointEntry>>,
+    /// IPs virtuales habilitadas temporalmente cuando no hay interfaces físicas disponibles.
+    enabled_fallback_ips: HashSet<Ipv4Addr>,
+    /// Marca temporal del último `daemon.browse()` para reiniciar el backoff tras inactividad.
+    last_browse_refresh: Instant,
+}
 
-/// Obtiene el daemon mDNS singleton o lo inicializa si aún no existe.
-fn get_or_init_mdns_daemon() -> Option<ServiceDaemon> {
-    let store = MDNS_DAEMON_STORE.get_or_init(|| StdMutex::new(None));
-    let mut guard = store.lock().ok()?;
+static MDNS_BROWSER_STORE: OnceLock<AsyncMutex<Option<PersistentMdnsBrowser>>> = OnceLock::new();
 
-    if let Some(ref daemon) = *guard {
-        return Some(daemon.clone());
+/// Sincroniza solo las interfaces de respaldo virtuales para evitar crecer `if_selections` en `mdns-sd`.
+fn sync_fallback_daemon_interfaces(browser: &mut PersistentMdnsBrowser, subnets: &[LocalSubnet]) {
+    let desired_fallback_ips: HashSet<Ipv4Addr> = subnets
+        .iter()
+        .filter(|s| is_virtual_interface(&s.interface_name))
+        .map(|s| s.local_ip)
+        .collect();
+
+    for &old_ip in browser
+        .enabled_fallback_ips
+        .difference(&desired_fallback_ips)
+    {
+        let _ = browser.daemon.disable_interface(IpAddr::V4(old_ip));
     }
 
-    match ServiceDaemon::new() {
-        Ok(daemon) => {
-            eprintln!(
-                "[INFO][NetworkDiscovery] Daemon mDNS persistente inicializado ({})",
-                AKATSUKI_MDNS_SERVICE_TYPE
-            );
-            *guard = Some(daemon.clone());
-            Some(daemon)
-        }
+    for &new_ip in desired_fallback_ips.difference(&browser.enabled_fallback_ips) {
+        let _ = browser.daemon.enable_interface(IpAddr::V4(new_ip));
+    }
+
+    browser.enabled_fallback_ips = desired_fallback_ips;
+}
+
+/// Inicializa el navegador mDNS persistente conservando vivo su `Receiver<ServiceEvent>`.
+fn init_persistent_mdns_browser(subnets: &[LocalSubnet]) -> Option<PersistentMdnsBrowser> {
+    let daemon = match ServiceDaemon::new() {
+        Ok(d) => d,
         Err(err) => {
             eprintln!(
-                "[WARN][NetworkDiscovery] No se pudo iniciar el daemon mDNS (se usará sondeo TCP): {:?}",
+                "[WARN][NetworkDiscovery] No se pudo iniciar el daemon mDNS: {:?}",
                 err
             );
-            None
+            return None;
         }
-    }
-}
-
-/// Limpia la referencia del daemon mDNS almacenado si el hilo interno se cerró inesperadamente.
-fn reset_mdns_daemon() {
-    if let Some(store) = MDNS_DAEMON_STORE.get() {
-        if let Ok(mut guard) = store.lock() {
-            if let Some(daemon) = guard.take() {
-                let _ = daemon.shutdown();
-            }
-        }
-    }
-}
-
-/// Descubre nodos Android anunciados mediante mDNS / DNS-SD reutilizando un daemon persistente.
-async fn discover_via_mdns(window: Duration) -> Vec<(Ipv4Addr, u16)> {
-    let browse_lock = MDNS_BROWSE_LOCK.get_or_init(|| AsyncMutex::new(()));
-    let _browse_guard = browse_lock.lock().await;
-
-    let Some(mut mdns) = get_or_init_mdns_daemon() else {
-        return Vec::new();
     };
 
-    let receiver = match mdns.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
+    let _ = daemon.accept_unsolicited(true);
+    let _ = daemon.disable_interface(IfKind::IPv6);
+    let _ = daemon.disable_interface(IfKind::Predicate(IfPredicate::new(|intf| {
+        is_virtual_interface(&intf.name)
+    })));
+
+    let receiver = match daemon.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
         Ok(rx) => rx,
-        Err(mdns_sd::Error::DaemonShutdown) => {
-            eprintln!(
-                "[WARN][NetworkDiscovery] Daemon mDNS se detuvo; reiniciando instancia persistente"
-            );
-            reset_mdns_daemon();
-            let Some(fresh) = get_or_init_mdns_daemon() else {
-                return Vec::new();
-            };
-            mdns = fresh;
-            match mdns.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
-                Ok(rx) => rx,
-                Err(err) => {
-                    eprintln!(
-                        "[WARN][NetworkDiscovery] Fallo al re-suscribir a mDNS {}: {:?}",
-                        AKATSUKI_MDNS_SERVICE_TYPE, err
-                    );
-                    return Vec::new();
-                }
-            }
-        }
         Err(err) => {
             eprintln!(
-                "[WARN][NetworkDiscovery] No se pudo suscribir a mDNS {}: {:?}",
+                "[WARN][NetworkDiscovery] Fallo al suscribir browse({}): {:?}",
                 AKATSUKI_MDNS_SERVICE_TYPE, err
             );
-            return Vec::new();
+            let _ = daemon.shutdown();
+            return None;
         }
     };
 
-    let mut discovered = HashSet::new();
-    let deadline = Instant::now() + window;
+    let mut browser = PersistentMdnsBrowser {
+        daemon,
+        receiver,
+        resolved_by_fullname: HashMap::new(),
+        enabled_fallback_ips: HashSet::new(),
+        last_browse_refresh: Instant::now(),
+    };
+    sync_fallback_daemon_interfaces(&mut browser, subnets);
+
+    eprintln!(
+        "[INFO][NetworkDiscovery] Navegador mDNS persistente inicializado ({})",
+        AKATSUKI_MDNS_SERVICE_TYPE
+    );
+
+    Some(browser)
+}
+
+fn clean_txt_prop(info: &ResolvedService, key: &str) -> Option<String> {
+    info.get_property_val_str(key)
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+}
+
+fn extract_txt_metadata(info: &ResolvedService) -> MdnsTxtMetadata {
+    MdnsTxtMetadata {
+        device_id: clean_txt_prop(info, "id"),
+        fingerprint_sha256: clean_txt_prop(info, "fp"),
+        device_name: clean_txt_prop(info, "name"),
+    }
+}
+
+/// Construye un `AndroidDeviceNode` de respaldo desde TXT (`id`, `fp`, `name`) si falla `/api/v1/health`.
+fn build_fallback_node_from_mdns_txt(
+    ip_str: String,
+    port: u16,
+    meta: MdnsTxtMetadata,
+) -> Option<AndroidDeviceNode> {
+    let device_id = meta.device_id?;
+    let fingerprint = meta.fingerprint_sha256?;
+    let device_name = meta
+        .device_name
+        .unwrap_or_else(|| format!("AkatsukiNode ({})", ip_str));
+
+    Some(AndroidDeviceNode {
+        device_id,
+        device_name,
+        model: "Android mDNS Node".to_string(),
+        ip_address: ip_str,
+        port,
+        tls_cert_fingerprint_sha256: fingerprint,
+        discovered_via: "mdns".to_string(),
+        paired: false,
+    })
+}
+
+fn process_mdns_event(
+    event: ServiceEvent,
+    resolved_by_fullname: &mut HashMap<String, Vec<MdnsEndpointEntry>>,
+) {
+    match event {
+        ServiceEvent::SearchStarted(msg) => {
+            eprintln!("[INFO][NetworkDiscovery] mDNS SearchStarted: {}", msg);
+        }
+        ServiceEvent::ServiceFound(ty, fullname) => {
+            eprintln!(
+                "[INFO][NetworkDiscovery] mDNS ServiceFound: {} ({}) — esperando resolución SRV/A...",
+                fullname, ty
+            );
+        }
+        ServiceEvent::ServiceResolved(info) => {
+            let port = info.get_port();
+            if port == 0 {
+                eprintln!(
+                    "[WARN][NetworkDiscovery] mDNS ServiceResolved con puerto 0 ignorado ({})",
+                    info.get_fullname()
+                );
+                return;
+            }
+
+            let v4_addrs = info.get_addresses_v4();
+            if v4_addrs.is_empty() {
+                eprintln!(
+                    "[WARN][NetworkDiscovery] Servicio mDNS {} resuelto sin IPv4 aún; direcciones={:?}",
+                    info.get_fullname(),
+                    info.get_addresses()
+                );
+                return;
+            }
+
+            let fullname = info.get_fullname().to_string();
+            let meta = extract_txt_metadata(&info);
+            let mut entries = Vec::new();
+
+            for ipv4 in v4_addrs {
+                if is_scannable_ipv4(ipv4) {
+                    eprintln!(
+                        "[INFO][NetworkDiscovery] Servicio mDNS resuelto ({}): {}:{} (id={:?}, fp={:?})",
+                        fullname, ipv4, port, meta.device_id, meta.fingerprint_sha256
+                    );
+                    entries.push(MdnsEndpointEntry {
+                        ip: ipv4,
+                        port,
+                        fullname: fullname.clone(),
+                        meta: meta.clone(),
+                    });
+                } else {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] IP mDNS descartada por no ser escaneable: {}:{} ({})",
+                        ipv4, port, fullname
+                    );
+                }
+            }
+
+            if !entries.is_empty() {
+                resolved_by_fullname.insert(fullname, entries);
+            }
+        }
+        ServiceEvent::ServiceRemoved(ty, fullname) => {
+            eprintln!(
+                "[INFO][NetworkDiscovery] mDNS ServiceRemoved: {} ({})",
+                fullname, ty
+            );
+            resolved_by_fullname.remove(&fullname);
+        }
+        _ => {}
+    }
+}
+
+/// Drena los eventos mDNS hasta `deadline`. Devuelve `false` si el canal se cerró inesperadamente.
+async fn drain_mdns_events_until(
+    browser: &mut PersistentMdnsBrowser,
+    deadline: Instant,
+) -> bool {
+    loop {
+        match browser.receiver.try_recv() {
+            Ok(event) => process_mdns_event(event, &mut browser.resolved_by_fullname),
+            Err(TryRecvError::Empty) => break,
+            Err(TryRecvError::Disconnected) => {
+                eprintln!("[WARN][NetworkDiscovery] Canal mDNS cerrado en buffer; se reiniciará");
+                return false;
+            }
+        }
+    }
 
     while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
-        match timeout(remaining, receiver.recv_async()).await {
-            Ok(Ok(ServiceEvent::SearchStarted(msg))) => {
-                eprintln!("[INFO][NetworkDiscovery] mDNS SearchStarted: {}", msg);
-            }
-            Ok(Ok(ServiceEvent::ServiceFound(ty, fullname))) => {
-                eprintln!(
-                    "[INFO][NetworkDiscovery] mDNS ServiceFound: {} ({}) — esperando resolución SRV/A...",
-                    fullname, ty
-                );
-            }
-            Ok(Ok(ServiceEvent::ServiceResolved(info))) => {
-                let port = info.get_port();
-                if port == 0 {
-                    eprintln!(
-                        "[WARN][NetworkDiscovery] mDNS ServiceResolved con puerto 0 ignorado ({})",
-                        info.get_fullname()
-                    );
-                    continue;
-                }
-
-                let v4_addrs = info.get_addresses_v4();
-                if v4_addrs.is_empty() {
-                    eprintln!(
-                        "[WARN][NetworkDiscovery] Servicio mDNS {} (puerto {}) resuelto sin direcciones IPv4; direcciones recibidas: {:?}",
-                        info.get_fullname(),
-                        port,
-                        info.get_addresses()
-                    );
-                    continue;
-                }
-
-                let txt_id = info.get_property_val_str("id").unwrap_or("-");
-                let txt_fp = info.get_property_val_str("fp").unwrap_or("-");
-                for ipv4 in v4_addrs {
-                    if is_scannable_ipv4(ipv4) {
-                        eprintln!(
-                            "[INFO][NetworkDiscovery] Servicio mDNS resuelto ({}): {}:{} (id={}, fp={})",
-                            info.get_fullname(),
-                            ipv4,
-                            port,
-                            txt_id,
-                            txt_fp
-                        );
-                        discovered.insert((ipv4, port));
-                    } else {
-                        eprintln!(
-                            "[WARN][NetworkDiscovery] IP mDNS descartada por no ser escaneable: {}:{} ({})",
-                            ipv4,
-                            port,
-                            info.get_fullname()
-                        );
-                    }
-                }
-            }
-            Ok(Ok(ServiceEvent::ServiceRemoved(ty, fullname))) => {
-                eprintln!(
-                    "[INFO][NetworkDiscovery] mDNS ServiceRemoved: {} ({})",
-                    fullname, ty
-                );
-            }
-            Ok(Ok(_)) => {}
+        match timeout(remaining, browser.receiver.recv_async()).await {
+            Ok(Ok(event)) => process_mdns_event(event, &mut browser.resolved_by_fullname),
             Ok(Err(err)) => {
-                eprintln!("[WARN][NetworkDiscovery] Canal mDNS cerrado: {:?}", err);
-                break;
+                eprintln!(
+                    "[WARN][NetworkDiscovery] Canal mDNS cerrado inesperadamente ({:?}); se reiniciará",
+                    err
+                );
+                return false;
             }
             Err(_) => break,
         }
     }
 
-    // Mantenemos el daemon y la caché mDNS vivos entre rondas (no llamamos stop_browse
-    // porque en mdns-sd borra el cache y corta resoluciones PTR->SRV->A pendientes).
-    discovered.into_iter().collect()
+    true
+}
+
+/// Descubre nodos Android anunciados mediante mDNS / DNS-SD manteniendo viva la suscripción y la caché.
+async fn discover_via_mdns(
+    subnets: &[LocalSubnet],
+    window: Duration,
+) -> (Vec<MdnsEndpointEntry>, Option<ServiceDaemon>) {
+    let store = MDNS_BROWSER_STORE.get_or_init(|| AsyncMutex::new(None));
+    let mut guard = store.lock().await;
+
+    if guard.is_none() {
+        *guard = init_persistent_mdns_browser(subnets);
+    }
+
+    let deadline = Instant::now() + window;
+    let mut needs_reset = false;
+
+    if let Some(browser) = guard.as_mut() {
+        sync_fallback_daemon_interfaces(browser, subnets);
+
+        // Si el navegador lleva tiempo inactivo sin nodos en caché, refrescamos la consulta PTR
+        // para reiniciar el backoff exponencial interno de `mdns-sd`.
+        if browser.resolved_by_fullname.is_empty()
+            && browser.last_browse_refresh.elapsed() >= MDNS_BROWSE_REFRESH_INTERVAL
+        {
+            match browser.daemon.browse(AKATSUKI_MDNS_SERVICE_TYPE) {
+                Ok(rx) => {
+                    eprintln!(
+                        "[INFO][NetworkDiscovery] Refrescando suscripción mDNS ({}) tras inactividad",
+                        AKATSUKI_MDNS_SERVICE_TYPE
+                    );
+                    browser.receiver = rx;
+                    browser.last_browse_refresh = Instant::now();
+                }
+                Err(err) => {
+                    eprintln!(
+                        "[WARN][NetworkDiscovery] Fallo al refrescar browse({}): {:?}; se reiniciará",
+                        AKATSUKI_MDNS_SERVICE_TYPE, err
+                    );
+                    needs_reset = true;
+                }
+            }
+        }
+
+        if !needs_reset {
+            needs_reset = !drain_mdns_events_until(browser, deadline).await;
+        }
+    }
+
+    if needs_reset {
+        if let Some(old) = guard.take() {
+            let _ = old.daemon.shutdown();
+        }
+        *guard = init_persistent_mdns_browser(subnets);
+
+        if let Some(fresh) = guard.as_mut() {
+            if Instant::now() < deadline && !drain_mdns_events_until(fresh, deadline).await {
+                if let Some(old) = guard.take() {
+                    let _ = old.daemon.shutdown();
+                }
+                return (Vec::new(), None);
+            }
+        }
+    }
+
+    let Some(browser) = guard.as_ref() else {
+        return (Vec::new(), None);
+    };
+
+    let entries = browser
+        .resolved_by_fullname
+        .values()
+        .flatten()
+        .cloned()
+        .collect();
+    (entries, Some(browser.daemon.clone()))
 }
 
 /// Realiza un sondeo TCP concurrente y acotado por semáforo sobre las subredes y puertos dados.
@@ -440,13 +619,16 @@ async fn scan_subnets_tcp(subnets: &[LocalSubnet], ports: &[u16]) -> Vec<(Ipv4Ad
     open_endpoints
 }
 
-/// Consulta `GET /api/v1/health` en paralelo para validar cada endpoint `(ip, port)` descubierto.
+/// Consulta `GET /api/v1/health` en paralelo para validar cada endpoint `(ip, port)` descubierto,
+/// utilizando los atributos TXT de mDNS como respaldo si el endpoint provino de mDNS.
 async fn verify_discovered_endpoints(
-    endpoints: BTreeMap<(Ipv4Addr, u16), &'static str>,
+    endpoints: BTreeMap<(Ipv4Addr, u16), CandidateEndpoint>,
+    mdns_daemon: Option<ServiceDaemon>,
 ) -> Vec<AndroidDeviceNode> {
     let mut set = JoinSet::new();
 
-    for ((ip, port), via) in endpoints {
+    for ((ip, port), candidate) in endpoints {
+        let daemon_handle = mdns_daemon.clone();
         set.spawn(async move {
             let ip_str = ip.to_string();
             match check_android_health(&ip_str, port).await {
@@ -458,7 +640,7 @@ async fn verify_discovered_endpoints(
                         ip_address: ip_str,
                         port: health.port,
                         tls_cert_fingerprint_sha256: health.tls_cert_fingerprint_sha256,
-                        discovered_via: via.to_string(),
+                        discovered_via: candidate.via.to_string(),
                         paired: false,
                     })
                 }
@@ -472,8 +654,27 @@ async fn verify_discovered_endpoints(
                 Err(err) => {
                     eprintln!(
                         "[WARN][NetworkDiscovery] Fallo verificando GET /api/v1/health en {}:{} (vía {}): {:?}",
-                        ip_str, port, via, err
+                        ip_str, port, candidate.via, err
                     );
+                    if candidate.via == "mdns" {
+                        // Solicitamos reconfirmación mDNS (RFC 6762 §10.4) para purgar instancias obsoletas
+                        // si la app Android cerró sin enviar paquete Goodbye.
+                        if let (Some(daemon), Some(fullname)) = (daemon_handle, candidate.fullname) {
+                            let _ = daemon.verify(fullname, MDNS_VERIFY_STALE_TIMEOUT);
+                        }
+
+                        if let Some(meta) = candidate.mdns_meta {
+                            if let Some(node) =
+                                build_fallback_node_from_mdns_txt(ip_str.clone(), port, meta)
+                            {
+                                eprintln!(
+                                    "[INFO][NetworkDiscovery] Usando metadatos TXT mDNS de respaldo para {}:{} (id={})",
+                                    ip_str, port, node.device_id
+                                );
+                                return Some(node);
+                            }
+                        }
+                    }
                     None
                 }
             }
@@ -520,23 +721,46 @@ pub async fn discover_android_nodes_on_lan(
         AKATSUKI_MDNS_SERVICE_TYPE
     );
 
-    if subnets.is_empty() {
+    let ((mdns_endpoints, mdns_daemon), tcp_endpoints) = if ENABLE_TCP_SUBNET_SCAN {
+        if subnets.is_empty() {
+            eprintln!(
+                "[WARN][NetworkDiscovery] No se detectaron interfaces IPv4 LAN activas; intentando solo vía mDNS"
+            );
+        }
+        tokio::join!(
+            discover_via_mdns(&subnets, MDNS_BROWSE_WINDOW),
+            scan_subnets_tcp(&subnets, &candidate_ports)
+        )
+    } else {
         eprintln!(
-            "[WARN][NetworkDiscovery] No se detectaron interfaces IPv4 LAN activas; intentando solo vía mDNS"
+            "[INFO][NetworkDiscovery] Barrido TCP multi-subred desactivado temporalmente; buscando únicamente vía mDNS"
+        );
+        (
+            discover_via_mdns(&subnets, MDNS_BROWSE_WINDOW).await,
+            Vec::new(),
+        )
+    };
+
+    let mut combined: BTreeMap<(Ipv4Addr, u16), CandidateEndpoint> = BTreeMap::new();
+    for (ip, port) in tcp_endpoints {
+        combined.insert(
+            (ip, port),
+            CandidateEndpoint {
+                via: "lan-scan",
+                fullname: None,
+                mdns_meta: None,
+            },
         );
     }
-
-    let (mdns_endpoints, tcp_endpoints) = tokio::join!(
-        discover_via_mdns(MDNS_BROWSE_WINDOW),
-        scan_subnets_tcp(&subnets, &candidate_ports)
-    );
-
-    let mut combined: BTreeMap<(Ipv4Addr, u16), &'static str> = BTreeMap::new();
-    for endpoint in tcp_endpoints {
-        combined.insert(endpoint, "lan-scan");
-    }
-    for endpoint in mdns_endpoints {
-        combined.insert(endpoint, "mdns");
+    for entry in mdns_endpoints {
+        combined.insert(
+            (entry.ip, entry.port),
+            CandidateEndpoint {
+                via: "mdns",
+                fullname: Some(entry.fullname),
+                mdns_meta: Some(entry.meta),
+            },
+        );
     }
 
     if combined.is_empty() {
@@ -548,7 +772,7 @@ pub async fn discover_android_nodes_on_lan(
     }
 
     let candidate_count = combined.len();
-    let nodes = verify_discovered_endpoints(combined).await;
+    let nodes = verify_discovered_endpoints(combined, mdns_daemon).await;
 
     eprintln!(
         "[INFO][NetworkDiscovery] Descubrimiento finalizado en {:?}: {} candidato(s) sondeados, {} nodo(s) Akatsuki verificados",
@@ -605,7 +829,7 @@ mod tests {
         let (prefix, network, hosts) = compute_subnet_hosts(local_ip, netmask, &own);
         assert_eq!(prefix, 26);
         assert_eq!(Ipv4Addr::from(network), Ipv4Addr::new(192, 168, 50, 64));
-        assert_eq!(hosts.len(), 61); // 62 usable hosts minus local_ip
+        assert_eq!(hosts.len(), 61);
         assert!(hosts.contains(&Ipv4Addr::new(192, 168, 50, 65)));
         assert!(hosts.contains(&Ipv4Addr::new(192, 168, 50, 126)));
         assert!(!hosts.contains(&Ipv4Addr::new(192, 168, 50, 127)));
@@ -625,8 +849,108 @@ mod tests {
         assert!(is_virtual_interface("docker0"));
         assert!(is_virtual_interface("veth1a2b3c"));
         assert!(is_virtual_interface("virbr0"));
+        assert!(is_virtual_interface("wg0"));
+        assert!(is_virtual_interface("tailscale0"));
         assert!(!is_virtual_interface("wlp2s0"));
         assert!(!is_virtual_interface("enp3s0"));
         assert!(!is_virtual_interface("Wi-Fi"));
+    }
+
+    #[test]
+    fn builds_fallback_node_when_mdns_txt_has_id_and_fp() {
+        let node = build_fallback_node_from_mdns_txt(
+            "192.168.1.44".to_string(),
+            8443,
+            MdnsTxtMetadata {
+                device_id: Some("ak-node-01".to_string()),
+                fingerprint_sha256: Some("AA:BB:CC".to_string()),
+                device_name: Some("Pixel 9 Pro".to_string()),
+            },
+        )
+        .expect("should build fallback node");
+
+        assert_eq!(node.device_id, "ak-node-01");
+        assert_eq!(node.device_name, "Pixel 9 Pro");
+        assert_eq!(node.ip_address, "192.168.1.44");
+        assert_eq!(node.port, 8443);
+        assert_eq!(node.tls_cert_fingerprint_sha256, "AA:BB:CC");
+        assert_eq!(node.discovered_via, "mdns");
+        assert!(!node.paired);
+
+        let unnamed = build_fallback_node_from_mdns_txt(
+            "192.168.1.45".to_string(),
+            9443,
+            MdnsTxtMetadata {
+                device_id: Some("ak-node-02".to_string()),
+                fingerprint_sha256: Some("DD:EE:FF".to_string()),
+                device_name: None,
+            },
+        )
+        .expect("should fall back to default name");
+        assert_eq!(unnamed.device_name, "AkatsukiNode (192.168.1.45)");
+
+        let missing_fp = build_fallback_node_from_mdns_txt(
+            "192.168.1.46".to_string(),
+            8443,
+            MdnsTxtMetadata {
+                device_id: Some("ak-node-03".to_string()),
+                fingerprint_sha256: None,
+                device_name: None,
+            },
+        );
+        assert!(missing_fp.is_none());
+    }
+
+    #[test]
+    fn processes_mdns_resolved_and_removed_events_filtering_ipv6_and_loopback() {
+        use mdns_sd::ServiceInfo;
+
+        let mut cache: HashMap<String, Vec<MdnsEndpointEntry>> = HashMap::new();
+        let fullname = "AkatsukiNode._akatsuki._tcp.local.";
+
+        // Evento solo IPv6 debe ignorarse sin registrar entrada
+        let v6_only = ServiceInfo::new(
+            AKATSUKI_MDNS_SERVICE_TYPE,
+            "AkatsukiNode",
+            "android.local.",
+            "fe80::1",
+            8443,
+            [("id", "ak-1"), ("fp", "AA:BB")].as_slice(),
+        )
+        .unwrap()
+        .as_resolved_service();
+        process_mdns_event(ServiceEvent::ServiceResolved(Box::new(v6_only)), &mut cache);
+        assert!(cache.is_empty());
+
+        // Evento mixto (loopback + LAN IPv4) conserva solo la IPv4 escaneable y los TXT limpios
+        let mixed = ServiceInfo::new(
+            AKATSUKI_MDNS_SERVICE_TYPE,
+            "AkatsukiNode",
+            "android.local.",
+            "127.0.0.1,192.168.1.77",
+            8443,
+            [("id", " ak-1 "), ("fp", "AA:BB"), ("name", "   ")].as_slice(),
+        )
+        .unwrap()
+        .as_resolved_service();
+        process_mdns_event(ServiceEvent::ServiceResolved(Box::new(mixed)), &mut cache);
+
+        let entries = cache.get(fullname).expect("should store IPv4 entry");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].ip, Ipv4Addr::new(192, 168, 1, 77));
+        assert_eq!(entries[0].port, 8443);
+        assert_eq!(entries[0].meta.device_id.as_deref(), Some("ak-1"));
+        assert_eq!(entries[0].meta.fingerprint_sha256.as_deref(), Some("AA:BB"));
+        assert_eq!(entries[0].meta.device_name, None);
+
+        // Evento ServiceRemoved debe purgar la entrada
+        process_mdns_event(
+            ServiceEvent::ServiceRemoved(
+                AKATSUKI_MDNS_SERVICE_TYPE.to_string(),
+                fullname.to_string(),
+            ),
+            &mut cache,
+        );
+        assert!(!cache.contains_key(fullname));
     }
 }
