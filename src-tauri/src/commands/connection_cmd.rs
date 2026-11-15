@@ -1,24 +1,28 @@
+use crate::application::discovery_use_cases::DiscoveryService;
 use crate::commands::explorer_cmd::get_system_hostname;
 use crate::domain::device::{
     ActiveSession, AndroidDeviceNode, HealthResponse, RevokeSessionResponse, StorageInfoResponse,
 };
+use crate::domain::discovery::LocalSubnetInfo;
 use crate::error::AkatsukiResult;
 use crate::infrastructure::android_client::{
     check_android_health, fetch_android_storage, pair_with_android_webservice,
     revoke_android_session,
 };
-use crate::infrastructure::mdns_discovery::{
-    discover_android_nodes_on_lan, list_local_network_subnets, LocalSubnetInfo,
-};
+use std::sync::Arc;
 
 #[tauri::command]
-pub async fn scan_lan_devices() -> AkatsukiResult<Vec<AndroidDeviceNode>> {
-    Ok(discover_android_nodes_on_lan().await)
+pub async fn scan_lan_devices(
+    discovery: tauri::State<'_, Arc<DiscoveryService>>,
+) -> AkatsukiResult<Vec<AndroidDeviceNode>> {
+    Ok(discovery.discover_android_nodes().await)
 }
 
 #[tauri::command]
-pub async fn get_local_network_subnets() -> AkatsukiResult<Vec<LocalSubnetInfo>> {
-    Ok(list_local_network_subnets())
+pub async fn get_local_network_subnets(
+    discovery: tauri::State<'_, Arc<DiscoveryService>>,
+) -> AkatsukiResult<Vec<LocalSubnetInfo>> {
+    Ok(discovery.list_local_subnets())
 }
 
 #[tauri::command]

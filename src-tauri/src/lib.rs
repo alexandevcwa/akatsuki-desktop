@@ -1,8 +1,10 @@
+pub mod application;
 pub mod commands;
 pub mod domain;
 pub mod error;
 pub mod infrastructure;
 
+use application::discovery_use_cases::DiscoveryService;
 use commands::{
     connection_cmd::{
         check_android_node_health, get_android_device_storage, get_local_network_subnets,
@@ -14,6 +16,10 @@ use commands::{
     },
     transfer_cmd::transfer_file_stream,
 };
+use infrastructure::discovery::{
+    IfAddrsNetworkProvider, MdnsSdGateway, ReqwestHealthGateway,
+};
+use std::sync::Arc;
 use tauri::Manager;
 
 /// En Linux (especialmente en Wayland sobre Manjaro/KDE/GNOME), el compositor obtiene el icono
@@ -99,7 +105,14 @@ pub fn run() {
     #[cfg(target_os = "linux")]
     ensure_linux_wayland_desktop_icon();
 
+    let discovery_service = Arc::new(DiscoveryService::new(
+        Arc::new(IfAddrsNetworkProvider),
+        Arc::new(MdnsSdGateway::new()),
+        Arc::new(ReqwestHealthGateway),
+    ));
+
     tauri::Builder::default()
+        .manage(discovery_service)
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::default().build())
