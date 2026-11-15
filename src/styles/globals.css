@@ -286,6 +286,12 @@
   animation: cyberSlideDownIn 150ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* Scrim oscuro compositado en GPU para modales/diálogos (sin backdrop-filter para 60/144 FPS en WebKitGTK y WebView2) */
+.cyber-modal-backdrop {
+  background-color: var(--ak-bg-scrim);
+  contain: layout paint style;
+}
+
 /* Contenedor optimizado para listas con scroll fluido sin Layout Thrashing */
 .cyber-scroll-container {
   will-change: scroll-position;

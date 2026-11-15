@@ -1,6 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { AlertTriangle, ArrowRightLeft, Trash2, X } from "lucide-react";
-import { useAnimatedPresence } from "@/shared/utils/useAnimatedPresence";
+import { CyberModal } from "./CyberModal";
 import { CyberPanel } from "./CyberPanel";
 import { CyberButton } from "./CyberButton";
 import { CyberBadge } from "./CyberBadge";
@@ -44,40 +44,19 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
-  const { shouldRender, isClosing } = useAnimatedPresence(open, 140);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isProcessing) {
-        onCancel();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, isProcessing, onCancel]);
-
-  if (!shouldRender) return null;
-
   const isDelete = mode === "delete";
 
   return (
-    <div
-      onClick={() => {
-        if (!isProcessing) onCancel();
-      }}
-      className={`fixed inset-0 z-50 bg-[#05050A]/88 flex items-center justify-center p-4 ${
-        isClosing ? "animate-cyber-backdrop-out" : "animate-cyber-backdrop-in"
-      }`}
+    <CyberModal
+      open={open}
+      onClose={onCancel}
+      closeOnBackdropClick={!isProcessing}
+      closeOnEscape={!isProcessing}
+      maxWidthClassName="max-w-lg"
+      ariaLabel={title}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-lg ${
-          isClosing ? "animate-cyber-modal-out" : "animate-cyber-modal-in"
-        }`}
-      >
-        <CyberPanel
-          title={title}
+      <CyberPanel
+        title={title}
           subtitle={subtitle}
           accentColor={isDelete ? "crimson" : "cyan"}
           headerRight={
@@ -191,7 +170,6 @@ export const CyberConfirmDialog: React.FC<CyberConfirmDialogProps> = ({
             </div>
           </div>
         </CyberPanel>
-      </div>
-    </div>
+    </CyberModal>
   );
 };

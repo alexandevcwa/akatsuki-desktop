@@ -6,4 +6,5 @@ export * from "./components/CyberPanel";
 export * from "./components/CyberBadge";
 export * from "./components/CyberInput";
 export * from "./components/CyberCode";
+export * from "./components/CyberModal";
 export * from "./components/CyberConfirmDialog";

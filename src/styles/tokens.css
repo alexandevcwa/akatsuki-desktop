@@ -7,6 +7,7 @@
   --ak-bg-panel: #141624;       /* Tactical Surface - Contenedores de listas y tarjetas */
   --ak-bg-elevated: #1d2033;    /* Uchiha Slate - Hover en filas, inputs activos */
   --ak-bg-glass: rgba(20, 22, 36, 0.78); /* Amaterasu Glass - Modales y overlays */
+  --ak-bg-scrim: rgba(3, 4, 9, 0.84);   /* Shadow Scrim - Fondo oscuro de enfoque para diálogos */
 
   /* =========================================================================
    * 2. COLORES DE MARCA AKATSUKI & ACENTOS CYBERPUNK

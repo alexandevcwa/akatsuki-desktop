@@ -16,12 +16,12 @@ import {
   CyberBadge,
   CyberInput,
   CyberCode,
+  CyberModal,
   Heading3,
   BodyText,
   MonoTelemetry,
   MonoHash,
 } from "@/design-system";
-import { useAnimatedPresence } from "@/shared/utils/useAnimatedPresence";
 import { getLocalNetworkSubnets } from "../services/connectionIpc";
 import { useConnectionStore } from "../store/useConnectionStore";
 
@@ -68,11 +68,6 @@ export const ConnectionRadarModal: React.FC = () => {
     errorMessage,
   } = useConnectionStore();
 
-  const { shouldRender, isClosing } = useAnimatedPresence(
-    isRadarModalOpen,
-    140,
-  );
-
   const [ipAddress, setIpAddress] = useState("");
   const [ipPlaceholder, setIpPlaceholder] = useState("Ej. 192.168.x.x");
   const [port, setPort] = useState("8443");
@@ -102,19 +97,6 @@ export const ConnectionRadarModal: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [isRadarModalOpen, scanNetwork]);
-
-  useEffect(() => {
-    if (!isRadarModalOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setRadarModalOpen(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isRadarModalOpen, setRadarModalOpen]);
-
-  if (!shouldRender) return null;
 
   const handleProbeHealth = async () => {
     const cleanIp = ipAddress.trim();
@@ -146,19 +128,13 @@ export const ConnectionRadarModal: React.FC = () => {
   const cleanError = formatUserFriendlyError(errorMessage);
 
   return (
-    <div
-      onClick={() => setRadarModalOpen(false)}
-      className={`fixed inset-0 z-50 bg-[#05050A]/88 flex items-center justify-center p-4 ${
-        isClosing ? "animate-cyber-backdrop-out" : "animate-cyber-backdrop-in"
-      }`}
+    <CyberModal
+      open={isRadarModalOpen}
+      onClose={() => setRadarModalOpen(false)}
+      maxWidthClassName="max-w-3xl"
+      ariaLabel="Radar de conexión con dispositivo Android"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-3xl ${
-          isClosing ? "animate-cyber-modal-out" : "animate-cyber-modal-in"
-        }`}
-      >
-        <CyberPanel
+      <CyberPanel
           title="RADAR DE CONEXIÓN // DISPOSITIVO ANDROID"
           subtitle="Vinculación segura en red local mediante detección automática y código PIN"
           accentColor="crimson"
@@ -357,7 +333,6 @@ export const ConnectionRadarModal: React.FC = () => {
             </form>
           </div>
         </CyberPanel>
-      </div>
-    </div>
+    </CyberModal>
   );
 };
