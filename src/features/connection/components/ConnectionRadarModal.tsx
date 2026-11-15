@@ -16,6 +16,7 @@ import {
   CyberButton,
   CyberBadge,
   CyberInput,
+  CyberCode,
   Heading3,
   BodyText,
   MonoTelemetry,
@@ -333,12 +334,10 @@ export const ConnectionRadarModal: React.FC = () => {
                   </div>
                 </div>
 
-                <CyberInput
+                <CyberCode
                   label="Código PIN de Vinculación"
-                  placeholder="Ingresa el PIN de 6 dígitos"
                   value={pinCode}
-                  onChange={(e) => setPinCode(e.target.value)}
-                  mono
+                  onChange={setPinCode}
                   required
                 />
 

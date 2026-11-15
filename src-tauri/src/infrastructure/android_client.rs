@@ -69,7 +69,7 @@ async fn ensure_success_status(resp: Response) -> AkatsukiResult<Response> {
     ))
 }
 
-/// 1. `GET /api/v1/health` — Verifica estado del servidor Android y obtiene su huella TLS.
+/// `GET /api/v1/health` — Verifica estado del servidor Android y obtiene su huella TLS.
 pub async fn check_android_health(ip_address: &str, port: u16) -> AkatsukiResult<HealthResponse> {
     let endpoint = format!("https://{}:{}/api/v1/health", ip_address, port);
     let client = build_android_https_client_with_timeouts(
@@ -81,7 +81,7 @@ pub async fn check_android_health(ip_address: &str, port: u16) -> AkatsukiResult
     Ok(resp.json::<HealthResponse>().await?)
 }
 
-/// 2. `POST /api/v1/auth/pair` — Realiza el handshake de emparejamiento con PIN y verificación TOFU.
+/// `POST /api/v1/auth/pair` — Realiza el handshake de emparejamiento con PIN y verificación TOFU.
 pub async fn pair_with_android_webservice(
     ip_address: &str,
     port: u16,
@@ -114,7 +114,7 @@ pub async fn pair_with_android_webservice(
     Ok(session)
 }
 
-/// 3. `POST /api/v1/auth/revoke` — Cierra la sesión y revoca el Bearer Token activo en el Android.
+/// `POST /api/v1/auth/revoke` — Cierra la sesión y revoca el Bearer Token activo en el Android.
 pub async fn revoke_android_session(
     ip_address: &str,
     port: u16,
@@ -133,7 +133,7 @@ pub async fn revoke_android_session(
     Ok(resp.json::<RevokeSessionResponse>().await?)
 }
 
-/// 4. `GET /api/v1/device/storage` — Consulta el espacio total y libre actualizado del Android.
+/// `GET /api/v1/device/storage` — Consulta el espacio total y libre actualizado del Android.
 pub async fn fetch_android_storage(
     ip_address: &str,
     port: u16,
@@ -202,7 +202,7 @@ pub async fn fetch_android_storage(
     }
 }
 
-/// 5. `GET /api/v1/files/list` — Obtiene el listado real de archivos y carpetas del dispositivo Android.
+/// `GET /api/v1/files/list` — Obtiene el listado real de archivos y carpetas del dispositivo Android.
 pub async fn fetch_android_directory(
     ip_address: &str,
     port: u16,
@@ -288,7 +288,7 @@ pub async fn fetch_android_directory(
     }
 }
 
-/// 6. `POST /api/v1/files/mkdir` — Crea una nueva carpeta en el almacenamiento del dispositivo Android.
+/// `POST /api/v1/files/mkdir` — Crea una nueva carpeta en el almacenamiento del dispositivo Android.
 pub async fn create_android_directory(
     ip_address: &str,
     port: u16,
@@ -309,7 +309,7 @@ pub async fn create_android_directory(
     Ok(resp.json::<MkdirResponse>().await?)
 }
 
-/// 7. `DELETE /api/v1/files/delete` — Elimina un archivo o directorio en el dispositivo Android.
+/// `DELETE /api/v1/files/delete` — Elimina un archivo o directorio en el dispositivo Android.
 pub async fn delete_android_entry(
     ip_address: &str,
     port: u16,
@@ -330,7 +330,7 @@ pub async fn delete_android_entry(
     Ok(resp.json::<DeleteEntryResponse>().await?)
 }
 
-/// 8. `POST /api/v1/files/upload` — Transfiere un archivo de PC → Android por streaming asíncrono
+/// `POST /api/v1/files/upload` — Transfiere un archivo de PC → Android por streaming asíncrono
 /// verificando la integridad SHA-256 de extremo a extremo.
 #[allow(clippy::too_many_arguments)]
 pub async fn upload_file_to_android_stream(
@@ -432,7 +432,7 @@ pub async fn upload_file_to_android_stream(
     Ok(expected_sha256)
 }
 
-/// 9. `GET /api/v1/files/download` — Descarga un archivo de Android → PC por streaming binario
+/// `GET /api/v1/files/download` — Descarga un archivo de Android → PC por streaming binario
 /// escribiendo en un archivo `.part` y verificando su hash SHA-256 al vuelo.
 #[allow(clippy::too_many_arguments)]
 pub async fn download_file_from_android_stream(
