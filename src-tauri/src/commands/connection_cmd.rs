@@ -12,8 +12,8 @@ use crate::infrastructure::mdns_discovery::{
 };
 
 #[tauri::command]
-pub async fn scan_lan_devices(ports: Option<Vec<u16>>) -> AkatsukiResult<Vec<AndroidDeviceNode>> {
-    Ok(discover_android_nodes_on_lan(ports).await)
+pub async fn scan_lan_devices() -> AkatsukiResult<Vec<AndroidDeviceNode>> {
+    Ok(discover_android_nodes_on_lan().await)
 }
 
 #[tauri::command]

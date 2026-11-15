@@ -82,14 +82,6 @@ export const ConnectionRadarModal: React.FC = () => {
   >(undefined);
   const [probingHealth, setProbingHealth] = useState(false);
 
-  const getCandidatePorts = (): number[] | undefined => {
-    const parsed = Number(port.trim());
-    if (Number.isInteger(parsed) && parsed > 0 && parsed <= 65535) {
-      return [parsed];
-    }
-    return undefined;
-  };
-
   // Diferir el escaneo de red 180ms hasta que la animación de apertura del modal haya terminado
   useEffect(() => {
     if (isRadarModalOpen) {
@@ -105,7 +97,7 @@ export const ConnectionRadarModal: React.FC = () => {
         .catch(() => {});
 
       const timer = setTimeout(() => {
-        scanNetwork(getCandidatePorts());
+        scanNetwork();
       }, 180);
       return () => clearTimeout(timer);
     }
@@ -200,7 +192,7 @@ export const ConnectionRadarModal: React.FC = () => {
                 <CyberButton
                   variant="secondary"
                   size="sm"
-                  onClick={() => scanNetwork(getCandidatePorts())}
+                  onClick={scanNetwork}
                   className={`tabular-nums min-w-[146px] ${
                     status === "scanning"
                       ? "pointer-events-none bg-akatsuki-cyan/15 cyber-border-cyan"

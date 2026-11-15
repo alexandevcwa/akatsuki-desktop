@@ -47,7 +47,7 @@ interface ConnectionStore {
   isRadarModalOpen: boolean;
 
   setRadarModalOpen: (open: boolean) => void;
-  scanNetwork: (candidatePorts?: number[]) => Promise<void>;
+  scanNetwork: () => Promise<void>;
   probeNodeHealth: (ipAddress: string, port: number) => Promise<AndroidDeviceNode | null>;
   connectToDevice: (
     ipAddress: string,
@@ -82,7 +82,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     set({ isRadarModalOpen: true, errorMessage: null });
   },
 
-  scanNetwork: async (candidatePorts) => {
+  scanNetwork: async () => {
     // Evitar múltiples conteos solapados si ya está buscando activamente
     if (get().status === "scanning" && get().scanRemainingSeconds > 0) {
       return;
@@ -126,7 +126,7 @@ export const useConnectionStore = create<ConnectionStore>((set, get) => ({
     try {
       while (Date.now() < endTime && currentToken === activeScanToken) {
         try {
-          const devices = await scanLanAndroidDevices(candidatePorts);
+          const devices = await scanLanAndroidDevices();
           if (currentToken !== activeScanToken) break;
 
           if (devices.length > 0) {

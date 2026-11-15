@@ -9,14 +9,10 @@ import {
 } from "@/shared/types/protocol";
 
 /**
- * Escanea las subredes locales activas de la PC mediante mDNS (puerto dinámico) y sondeo TCP (`GET /api/v1/health`).
+ * Descubre dispositivos Android activos en la red local mediante mDNS/DNS-SD (`_akatsuki._tcp.local.`).
  */
-export async function scanLanAndroidDevices(
-  ports?: number[]
-): Promise<AndroidDeviceNode[]> {
-  return invoke<AndroidDeviceNode[]>("scan_lan_devices", {
-    ports: ports && ports.length > 0 ? ports : null,
-  });
+export async function scanLanAndroidDevices(): Promise<AndroidDeviceNode[]> {
+  return invoke<AndroidDeviceNode[]>("scan_lan_devices");
 }
 
 /**
